@@ -13,10 +13,6 @@
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="Auto">
 
-    <Window.DataContext>
-        <local:MainViewModel/>
-    </Window.DataContext>
-
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -32,14 +28,6 @@
                     <TextBlock Text="Dashboard"/>
                 </StackPanel>
             </Button>
-
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Backup" Margin="0,0,10,0"/>
-                    <TextBlock Text="Backups"/>
-                </StackPanel>
-            </Button>
-
             <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Cog" Margin="0,0,10,0"/>

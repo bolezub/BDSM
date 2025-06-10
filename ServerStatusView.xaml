@@ -35,7 +35,7 @@
 
             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="20,0" HorizontalAlignment="Center">
                 <TextBlock Text="CPU" Foreground="LightGray"/>
-                <TextBlock Text="{Binding CpuUsage, StringFormat='{}{0}%'}" Foreground="White" FontSize="16"/>
+                <TextBlock Text="{Binding CpuUsage, StringFormat='{}{0:F2}%'}" Foreground="White" FontSize="16"/>
             </StackPanel>
             <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="20,0" HorizontalAlignment="Center">
                 <TextBlock Text="RAM" Foreground="LightGray"/>
@@ -48,14 +48,13 @@
             </Border>
 
             <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Style="{DynamicResource MaterialDesignFloatingActionMiniButton}" Margin="5" ToolTip="Start">
+                <Button Style="{DynamicResource MaterialDesignFloatingActionMiniButton}" Margin="5" ToolTip="Start"
+            Command="{Binding StartServerCommand}">
                     <materialDesign:PackIcon Kind="Play" />
                 </Button>
-                <Button Style="{DynamicResource MaterialDesignFloatingActionMiniButton}" Margin="5" ToolTip="Stop">
+                <Button Style="{DynamicResource MaterialDesignFloatingActionMiniButton}" Margin="5" ToolTip="Stop"
+            Command="{Binding StopServerCommand}">
                     <materialDesign:PackIcon Kind="Stop" />
-                </Button>
-                <Button Style="{DynamicResource MaterialDesignFloatingActionMiniButton}" Margin="5" ToolTip="Restart">
-                    <materialDesign:PackIcon Kind="Restart" />
                 </Button>
             </StackPanel>
         </Grid>

@@ -122,7 +122,7 @@
     "discordPleaMessage": "ServerChat Join discord.gg/aesirgaming for rules. Please use discord for issue reporting and base claiming!",
     "steamApiUrl": "https://api.steamcmd.net/v1/info/2430930",
     "startServersScriptPath": "D:\\Scripts\\StartServers.ps1",
-    "modArguments": "-mods=928708,942024,929684,929785,928548,950421,1007962,940975,1056780,991503,992975,951574,1097188,955932,931874,1200142,939507,949521,877745",
+    "modArguments": "-mods=928708",
     "startArgumentsTemplate": "{mapFolder}?listen?MultiHome={serverIP}?Port={port}?QueryPort={queryPort}?AllowCrateSpawnsOnTopOfStructures=True -noundermeshchecking -noundermeshkilling -EnableIdlePlayerKick -clusterid=boleworld -ClusterDirOverride=d:\\asadata -NoTransferFromFiltering -forcerespawndinos -servergamelog -servergamelogincludetribelogs -ServerRCONOutputTribeLogs -nobattleye -WinLiveMaxPlayers=60",
     "EnforceDelaySeconds": 120,
     "playerCountCheckInterval": 10,

@@ -1,18 +1,22 @@
 ﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
-using BDSM; // This using statement is now handled by the namespace
+using System.Windows;
+using BDSM;
 using Newtonsoft.Json;
 
-namespace BDSM
+public class MainViewModel : BaseViewModel
 {
-    public class MainViewModel
+    public ObservableCollection<ServerViewModel> Servers { get; set; }
+
+    public MainViewModel()
     {
-        public ObservableCollection<ServerViewModel> Servers { get; set; }
+        Servers = new ObservableCollection<ServerViewModel>();
 
-        public MainViewModel()
+        bool isInDesignMode = DesignerProperties.GetIsInDesignMode(new DependencyObject());
+
+        if (!isInDesignMode)
         {
-            Servers = new ObservableCollection<ServerViewModel>();
-
             var config = JsonConvert.DeserializeObject<GlobalConfig>(File.ReadAllText("config.json"));
 
             if (config != null && config.Servers != null)
@@ -21,28 +25,29 @@ namespace BDSM
                 {
                     if (!serverConfig.IsHidden)
                     {
-                        var svm = new ServerViewModel(serverConfig);
-                        // Set placeholder data based on the mockup
-                        if (svm.ServerName == "The Island")
-                        {
-                            svm.Status = "Running"; svm.Pid = "PID 98451"; svm.CurrentPlayers = 1; svm.CpuUsage = 43; svm.RamUsage = 25;
-                        }
-                        else if (svm.ServerName == "Scorched Earth")
-                        {
-                            svm.Status = "Starting"; svm.CurrentPlayers = 0;
-                        }
-                        else if (svm.ServerName == "The Center")
-                        {
-                            svm.Status = "Stopped"; svm.CurrentPlayers = 0;
-                        }
-                        else // For Aberration, Extinction etc.
-                        {
-                            svm.Status = "Running"; svm.Pid = $"PID {new System.Random().Next(10000, 20000)}"; svm.CurrentPlayers = 1; svm.CpuUsage = 43; svm.RamUsage = 25;
-                        }
+                        var svm = new ServerViewModel(serverConfig, config); // This line is correct
                         Servers.Add(svm);
                     }
                 }
             }
+        }
+        else
+        {
+            // --- This section is corrected ---
+            var dummyServerConfig = new ServerConfig { Name = "ASA Design Time", MemoryThresholdGB = 35 };
+            var dummyGlobalConfig = new GlobalConfig(); // Create a dummy global config
+            var dummyServer = new ServerViewModel(dummyServerConfig, dummyGlobalConfig) // Pass it here
+            {
+                Status = "Running",
+                Pid = "PID 12345",
+                CurrentPlayers = 3,
+                MaxPlayers = 60,
+                CpuUsage = 50,
+                RamUsage = 16,
+                ServerVersion = "design.time.version"
+            };
+            Servers.Add(dummyServer);
+            Servers.Add(dummyServer);
         }
     }
 }

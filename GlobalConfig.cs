@@ -20,6 +20,13 @@ namespace BDSM
         [JsonProperty("serverIP")]
         public string ServerIP { get; set; } = string.Empty;
 
-        // You can continue to add the rest of the properties from your config.json here
+        [JsonProperty("rconPassword")]
+        public string RconPassword { get; set; } = string.Empty;
+
+        [JsonProperty("modArguments")]
+        public string ModArguments { get; set; } = string.Empty;
+
+        [JsonProperty("startArgumentsTemplate")]
+        public string StartArgumentsTemplate { get; set; } = string.Empty;
     }
 }
