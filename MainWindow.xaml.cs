@@ -10,8 +10,8 @@ namespace BDSM
         public MainWindow()
         {
             InitializeComponent();
-            // This line now correctly sets the DataContext at runtime
-            this.DataContext = new MainViewModel();
+            // This line now points to our renamed ViewModel
+            this.DataContext = new ApplicationViewModel();
         }
     }
 }

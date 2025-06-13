@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 
 public class ServerConfig
 {
@@ -14,7 +15,7 @@ public class ServerConfig
     [JsonProperty("startExecutable")]
     public string StartExecutable { get; set; } = string.Empty;
 
-    [JsonProperty("mapFolder")] // <-- Added this property
+    [JsonProperty("mapFolder")]
     public string MapFolder { get; set; } = string.Empty;
 
     [JsonProperty("port")]
@@ -26,12 +27,18 @@ public class ServerConfig
     [JsonProperty("rconPort")]
     public int RconPort { get; set; }
 
-    [JsonProperty("active")]
-    public bool IsActive { get; set; }
+    [JsonProperty("mapSpecificMods")]
+    public List<int> MapSpecificMods { get; set; } = new List<int>();
 
-    [JsonProperty("hidden")]
-    public bool IsHidden { get; set; }
+    [JsonProperty("discordNotificationsEnabled")]
+    public bool DiscordNotificationsEnabled { get; set; }
 
     [JsonProperty("memoryThresholdGB")]
     public int MemoryThresholdGB { get; set; }
+
+    [JsonProperty("active")]
+    public bool Active { get; set; }
+
+    [JsonProperty("hidden")]
+    public bool IsHidden { get; set; }
 }

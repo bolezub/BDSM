@@ -13,6 +13,25 @@
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="Auto">
 
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type local:ApplicationViewModel}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Servers}" Margin="20">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <local:ServerStatusView/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type local:SchedulesViewModel}">
+            <local:SchedulesView/>
+        </DataTemplate>
+
+    </Window.Resources>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -22,13 +41,42 @@
         <StackPanel Grid.Column="0" Background="#2C2646" Width="200">
             <TextBlock Text="bole's dedicated server manager" Foreground="White" FontWeight="Bold" Margin="20" FontSize="16" TextWrapping="Wrap"/>
 
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,10,10,5">
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,10,10,5"
+                    Command="{Binding ShowDashboardCommand}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="ViewDashboard" Margin="0,0,10,0"/>
                     <TextBlock Text="Dashboard"/>
                 </StackPanel>
             </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5">
+
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5"
+                    Command="{Binding ShowSchedulesCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="ClockOutline" Margin="0,0,10,0"/>
+                    <TextBlock Text="Schedules"/>
+                </StackPanel>
+            </Button>
+
+            <Button Style="{DynamicResource MaterialDesignTextButton}" 
+                    HorizontalAlignment="Left" Margin="10,5,10,5"
+                    Command="{Binding CheckAllServersForUpdateCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="CloudSyncOutline" Margin="0,0,10,0"/>
+                    <TextBlock Text="Check for Updates"/>
+                </StackPanel>
+            </Button>
+
+            <Button Style="{DynamicResource MaterialDesignTextButton}" 
+                    HorizontalAlignment="Left" Margin="10,0,10,5"
+                    Command="{Binding StartUpdateCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Update" Foreground="Orange" Margin="0,0,10,0"/>
+                    <TextBlock Text="Start Update"/>
+                </StackPanel>
+            </Button>
+
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5"
+                    Command="{Binding ShowSettingsCommand}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Cog" Margin="0,0,10,0"/>
                     <TextBlock Text="Settings"/>
@@ -36,14 +84,7 @@
             </Button>
         </StackPanel>
 
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Servers}" Margin="20">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <local:ServerStatusView/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <ContentControl Grid.Column="1" Content="{Binding CurrentView}"/>
+
     </Grid>
 </Window>

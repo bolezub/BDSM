@@ -7,10 +7,12 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-
                 <materialDesign:BundledTheme BaseTheme="Dark" PrimaryColor="DeepPurple" SecondaryColor="Lime" />
-
             </ResourceDictionary.MergedDictionaries>
+
+            <local:BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <local:NotNullToBooleanConverter x:Key="NotNullToBooleanConverter"/>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>
