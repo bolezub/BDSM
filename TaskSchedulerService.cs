@@ -24,7 +24,7 @@ namespace BDSM
         {
             _config = config;
             _appViewModel = appViewModel;
-            _timer = new Timer(OnTimerTick, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(1)); // Check every second
+            _timer = new Timer(OnTimerTick, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(1));
         }
 
         private static bool IsScheduledForToday(ScheduledTask task, DayOfWeek today)
@@ -51,11 +51,8 @@ namespace BDSM
 
             var now = DateTime.Now;
 
-            // This is the robust check. It compares the current time against the scheduled time parts.
             var tasksToRun = _config.Schedules.Where(task =>
             {
-                // Has this task already run at this exact scheduled time today?
-                // We create a specific DateTime for this run to check against our history.
                 var thisRunInstance = now.Date + task.ScheduledTime;
                 bool hasRunForThisInstance = _lastRunTimestamps.TryGetValue(task.Id, out var lastRun) && lastRun == thisRunInstance;
 
@@ -71,11 +68,12 @@ namespace BDSM
             {
                 _ = Task.Run(async () =>
                 {
+                    var firstTask = tasksToRun.First();
+                    if (IsMajorOperationInProgress) return;
+
                     SetOperationLock();
                     try
                     {
-                        var firstTask = tasksToRun.First();
-                        // Mark this specific instance (e.g., 6/13/2025 7:00:00 PM) as having run
                         _lastRunTimestamps[firstTask.Id] = now.Date + firstTask.ScheduledTime;
                         System.Diagnostics.Debug.WriteLine($"Executing scheduled task: {firstTask.Name} of type {firstTask.TaskType}");
 
@@ -88,6 +86,9 @@ namespace BDSM
                                 break;
                             case ScheduledTaskType.MaintenanceShutdown:
                                 await UpdateManager.PerformMaintenanceShutdownAsync(activeServers, _config);
+                                break;
+                            case ScheduledTaskType.FrequentBackup:
+                                await BackupManager.PerformBackupAsync(activeServers, _config);
                                 break;
                         }
                     }

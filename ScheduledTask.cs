@@ -7,12 +7,13 @@ namespace BDSM
     public enum ScheduledTaskType
     {
         DailyReboot,
-        MaintenanceShutdown
+        MaintenanceShutdown,
+        FrequentBackup // Renamed from WeeklyBackup
     }
 
     public class ScheduledTask : BaseViewModel
     {
-        // Private fields for properties
+        // ... all other existing code in this file remains the same ...
         private string _name = "New Task";
         private ScheduledTaskType _taskType = ScheduledTaskType.DailyReboot;
         private TimeSpan _scheduledTime = new TimeSpan(5, 0, 0);
@@ -25,7 +26,6 @@ namespace BDSM
         private bool _runsOnSaturday = true;
         private bool _runsOnSunday = true;
 
-        // Public properties that notify the UI on change
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Name { get => _name; set { _name = value; OnPropertyChanged(); } }
         [JsonConverter(typeof(StringEnumConverter))]
@@ -66,20 +66,15 @@ namespace BDSM
                     if (shouldRunOnThisDay)
                     {
                         var nextRun = checkDay.Date + ScheduledTime;
-                        // If the calculated time for today is already past, we look for the next valid day
                         if (nextRun > now)
                         {
                             return nextRun;
                         }
                     }
                 }
-                // If no time in the next 7 days is found, it means the next instance is more than a week away
-                // (This can happen if all days are unchecked, so we return null)
                 return null;
             }
         }
-
-        // This method will be called by our UI timer to force the NextCalculatedRunTime to be re-evaluated
         public void Refresh()
         {
             OnPropertyChanged(nameof(NextCalculatedRunTime));

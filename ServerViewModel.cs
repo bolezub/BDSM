@@ -36,7 +36,6 @@ namespace BDSM
         private bool _isUpdateAvailable = false;
         private Process? _serverProcess;
 
-        // --- NEW PROPERTY ---
         public List<string> OnlinePlayers { get; private set; } = new List<string>();
 
         public ObservableCollection<ISeries> Series { get; set; }
@@ -50,6 +49,7 @@ namespace BDSM
         public string ServerName => _serverConfig.Name.Replace("ASA ", "");
         public int RconPort => _serverConfig.RconPort;
         public string InstallDir => _serverConfig.InstallDir;
+        public string MapFolder => _serverConfig.MapFolder; // <-- THIS IS THE NEW LINE THAT FIXES THE ERROR
         public bool DiscordNotificationsEnabled => _serverConfig.DiscordNotificationsEnabled;
         public bool IsActive => _serverConfig.Active;
 
@@ -237,7 +237,7 @@ namespace BDSM
                     await UpdateServerStatus();
 
                     checkCounter++;
-                    if (checkCounter >= 30) // ~5 minute interval for version check (30 * 10s)
+                    if (checkCounter >= 30)
                     {
                         await CheckForUpdate();
                         checkCounter = 0;
@@ -293,7 +293,7 @@ namespace BDSM
                 }
                 Pid = string.Empty;
                 CurrentPlayers = 0;
-                OnlinePlayers.Clear(); // Clear player list when server is down
+                OnlinePlayers.Clear();
                 CpuUsage = 0;
                 RamUsage = 0;
                 _serverProcess = null;
@@ -323,8 +323,7 @@ namespace BDSM
                     Status = "Running";
                 }
 
-                // --- MODIFIED ---
-                ParsePlayerInfo(response); // This now sets player count AND the list of names
+                ParsePlayerInfo(response);
 
                 if (wasJustStarted && this.DiscordNotificationsEnabled)
                 {
@@ -393,7 +392,6 @@ namespace BDSM
             }
         }
 
-        // --- MODIFIED: Renamed and enhanced this method ---
         private void ParsePlayerInfo(string rconResponse)
         {
             OnlinePlayers.Clear();
@@ -407,15 +405,12 @@ namespace BDSM
             var lines = rconResponse.Trim().Split('\n');
             foreach (var line in lines)
             {
-                // Line format: "1. PlayerName, SteamId, ..."
                 var parts = line.Split(',');
                 if (parts.Length > 0)
                 {
-                    // Get the first part (e.g., "1. PlayerName") and find the first space
                     int spaceIndex = parts[0].IndexOf(' ');
                     if (spaceIndex != -1)
                     {
-                        // The name is everything after that first space
                         string name = parts[0].Substring(spaceIndex + 1).Trim();
                         OnlinePlayers.Add(name);
                     }

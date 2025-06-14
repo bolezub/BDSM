@@ -14,6 +14,10 @@
         TextOptions.TextRenderingMode="Auto">
 
     <Window.Resources>
+        <DataTemplate DataType="{x:Type local:BackupViewModel}">
+            <local:BackupsView/>
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type local:ApplicationViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Servers}" Margin="20">
@@ -46,6 +50,14 @@
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="ViewDashboard" Margin="0,0,10,0"/>
                     <TextBlock Text="Dashboard"/>
+                </StackPanel>
+            </Button>
+
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5"
+                    Command="{Binding ShowBackupsCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="DatabaseSyncOutline" Margin="0,0,10,0"/>
+                    <TextBlock Text="Backups"/>
                 </StackPanel>
             </Button>
 

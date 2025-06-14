@@ -17,12 +17,14 @@ namespace BDSM
         private object? _dashboardView;
         private object? _settingsView;
         private object? _schedulesView;
+        private object? _backupsView;
 
         public ICommand CheckAllServersForUpdateCommand { get; }
         public ICommand StartUpdateCommand { get; }
         public ICommand ShowDashboardCommand { get; }
         public ICommand ShowSettingsCommand { get; }
         public ICommand ShowSchedulesCommand { get; }
+        public ICommand ShowBackupsCommand { get; }
 
         public object? CurrentView
         {
@@ -50,6 +52,14 @@ namespace BDSM
                 CurrentView = _schedulesView;
             });
 
+            ShowBackupsCommand = new RelayCommand(_ => {
+                if (_backupsView == null && _config != null)
+                {
+                    _backupsView = new BackupsView { DataContext = new BackupViewModel(_config, Servers) };
+                }
+                CurrentView = _backupsView;
+            });
+
             CheckAllServersForUpdateCommand = new RelayCommand(async _ => await CheckAllServersForUpdate(), _ => !TaskSchedulerService.IsMajorOperationInProgress);
             StartUpdateCommand = new RelayCommand(async _ => await StartUpdate(), _ => CanStartUpdate());
 
@@ -63,6 +73,7 @@ namespace BDSM
                 {
                     DataLogger.InitializeDatabase(_config.BackupPath);
                     TaskSchedulerService.Start(_config, this);
+                    BackupSchedulerService.Start(_config, this); // <-- ADD THIS LINE
 
                     foreach (var serverConfig in _config.Servers)
                     {
@@ -89,8 +100,6 @@ namespace BDSM
             ShowNotification("Update check finished.");
         }
 
-
-        // --- THIS IS THE MODIFIED METHOD ---
         private async Task StartUpdate()
         {
             if (_config == null) return;
@@ -103,8 +112,6 @@ namespace BDSM
                 return;
             }
 
-            // The logic is much simpler now. We just set the lock and call the new UpdateManager method.
-            // UpdateManager now handles the entire independent update process for each server.
             TaskSchedulerService.SetOperationLock();
             try
             {
@@ -117,7 +124,6 @@ namespace BDSM
                 TaskSchedulerService.ReleaseOperationLock();
             }
         }
-        // --- END OF MODIFICATION ---
 
         private bool CanStartUpdate()
         {

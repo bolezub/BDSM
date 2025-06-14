@@ -8,8 +8,15 @@ namespace BDSM
         [JsonProperty("servers")]
         public List<ServerConfig> Servers { get; set; } = new List<ServerConfig>();
 
-        [JsonProperty("schedules")] // <-- New property for scheduled tasks
+        [JsonProperty("schedules")]
         public List<ScheduledTask> Schedules { get; set; } = new List<ScheduledTask>();
+
+        [JsonProperty("backupIntervalMinutes")]
+        public int BackupIntervalMinutes { get; set; } = 30;
+
+        // --- NEW PROPERTY ---
+        [JsonProperty("backupRetryIntervalMinutes")]
+        public int BackupRetryIntervalMinutes { get; set; } = 5; // Default to 5 minutes for retry
 
         [JsonProperty("mcrconPath")]
         public string McRconPath { get; set; } = string.Empty;
