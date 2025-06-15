@@ -12,6 +12,7 @@ namespace BDSM
         private static GlobalConfig? _config;
         private static ApplicationViewModel? _appViewModel;
         private static readonly Dictionary<Guid, DateTime> _lastRunTimestamps = new Dictionary<Guid, DateTime>();
+        public static ScheduledTask? NextScheduledTask { get; private set; }
 
         public static bool IsMajorOperationInProgress { get; private set; } = false;
 
@@ -25,6 +26,16 @@ namespace BDSM
             _config = config;
             _appViewModel = appViewModel;
             _timer = new Timer(OnTimerTick, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(1));
+        }
+
+        public static void UpdateNextScheduledTask()
+        {
+            if (_config == null) return;
+
+            NextScheduledTask = _config.Schedules
+                .Where(s => s.IsEnabled && s.NextCalculatedRunTime.HasValue)
+                .OrderBy(s => s.NextCalculatedRunTime)
+                .FirstOrDefault();
         }
 
         private static bool IsScheduledForToday(ScheduledTask task, DayOfWeek today)
@@ -51,35 +62,28 @@ namespace BDSM
 
             var now = DateTime.Now;
 
-            var tasksToRun = _config.Schedules.Where(task =>
+            // Check if the next task's time has passed
+            if (NextScheduledTask != null && now >= NextScheduledTask.NextCalculatedRunTime)
             {
-                var thisRunInstance = now.Date + task.ScheduledTime;
-                bool hasRunForThisInstance = _lastRunTimestamps.TryGetValue(task.Id, out var lastRun) && lastRun == thisRunInstance;
+                var taskToRun = NextScheduledTask; // Run the task we identified
 
-                return task.IsEnabled &&
-                       !hasRunForThisInstance &&
-                       IsScheduledForToday(task, now.DayOfWeek) &&
-                       task.ScheduledTime.Hours == now.TimeOfDay.Hours &&
-                       task.ScheduledTime.Minutes == now.TimeOfDay.Minutes &&
-                       task.ScheduledTime.Seconds == now.TimeOfDay.Seconds;
-            }).ToList();
+                // Avoid re-running the same instance if the clock ticks multiple times
+                var thisRunInstance = now.Date + taskToRun.ScheduledTime;
+                if (_lastRunTimestamps.ContainsKey(taskToRun.Id) && _lastRunTimestamps[taskToRun.Id] == thisRunInstance)
+                {
+                    return;
+                }
 
-            if (tasksToRun.Any())
-            {
                 _ = Task.Run(async () =>
                 {
-                    var firstTask = tasksToRun.First();
                     if (IsMajorOperationInProgress) return;
-
                     SetOperationLock();
                     try
                     {
-                        _lastRunTimestamps[firstTask.Id] = now.Date + firstTask.ScheduledTime;
-                        System.Diagnostics.Debug.WriteLine($"Executing scheduled task: {firstTask.Name} of type {firstTask.TaskType}");
-
+                        _lastRunTimestamps[taskToRun.Id] = thisRunInstance;
+                        System.Diagnostics.Debug.WriteLine($"Executing scheduled task: {taskToRun.Name} of type {taskToRun.TaskType}");
                         var activeServers = _appViewModel.Servers.Where(s => s.IsActive).ToList();
-
-                        switch (firstTask.TaskType)
+                        switch (taskToRun.TaskType)
                         {
                             case ScheduledTaskType.DailyReboot:
                                 await UpdateManager.PerformScheduledRebootAsync(activeServers, _config);
@@ -95,6 +99,7 @@ namespace BDSM
                     finally
                     {
                         ReleaseOperationLock();
+                        UpdateNextScheduledTask(); // Find the next task after one has run
                     }
                 });
             }

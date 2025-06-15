@@ -14,9 +14,12 @@ namespace BDSM
         [JsonProperty("backupIntervalMinutes")]
         public int BackupIntervalMinutes { get; set; } = 30;
 
-        // --- NEW PROPERTY ---
         [JsonProperty("backupRetryIntervalMinutes")]
-        public int BackupRetryIntervalMinutes { get; set; } = 5; // Default to 5 minutes for retry
+        public int BackupRetryIntervalMinutes { get; set; } = 5;
+
+        // --- NEW PROPERTY ---
+        [JsonProperty("updateCheckIntervalMinutes")]
+        public int UpdateCheckIntervalMinutes { get; set; } = 15; // Default to 15 minutes
 
         [JsonProperty("mcrconPath")]
         public string McRconPath { get; set; } = string.Empty;

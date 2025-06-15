@@ -229,23 +229,15 @@ namespace BDSM
 
         private async Task MonitorServerAsync()
         {
-            int checkCounter = 0;
             while (true)
             {
                 try
                 {
                     await UpdateServerStatus();
-
-                    checkCounter++;
-                    if (checkCounter >= 30)
-                    {
-                        await CheckForUpdate();
-                        checkCounter = 0;
-                    }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"!!! UNEXPECTED ERROR in monitoring loop for {_serverConfig.Name}: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"!!! UNEXPECTED ERROR in monitoring loop for {_serverConfig.Name}: {ex.Message}");
                 }
                 await Task.Delay(TimeSpan.FromSeconds(10));
             }

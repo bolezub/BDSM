@@ -25,6 +25,8 @@ namespace BDSM
         public ICommand ShowSettingsCommand { get; }
         public ICommand ShowSchedulesCommand { get; }
         public ICommand ShowBackupsCommand { get; }
+        public StatusBarViewModel StatusBar { get; }
+
 
         public object? CurrentView
         {
@@ -34,6 +36,7 @@ namespace BDSM
 
         public ApplicationViewModel()
         {
+            StatusBar = new StatusBarViewModel();
             Servers = new ObservableCollection<ServerViewModel>();
 
             ShowDashboardCommand = new RelayCommand(_ => CurrentView = _dashboardView);
@@ -73,7 +76,8 @@ namespace BDSM
                 {
                     DataLogger.InitializeDatabase(_config.BackupPath);
                     TaskSchedulerService.Start(_config, this);
-                    BackupSchedulerService.Start(_config, this); // <-- ADD THIS LINE
+                    BackupSchedulerService.Start(_config, this);
+                    UpdateSchedulerService.Start(_config, this); // <-- ADD THIS LINE
 
                     foreach (var serverConfig in _config.Servers)
                     {

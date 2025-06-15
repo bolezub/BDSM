@@ -14,6 +14,10 @@
         TextOptions.TextRenderingMode="Auto">
 
     <Window.Resources>
+        <DataTemplate DataType="{x:Type local:StatusBarViewModel}">
+            <local:StatusBarView/>
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type local:BackupViewModel}">
             <local:BackupsView/>
         </DataTemplate>
@@ -37,12 +41,16 @@
     </Window.Resources>
 
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Column="0" Background="#2C2646" Width="200">
+        <StackPanel Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Background="#2C2646" Width="200">
             <TextBlock Text="bole's dedicated server manager" Foreground="White" FontWeight="Bold" Margin="20" FontSize="16" TextWrapping="Wrap"/>
 
             <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,10,10,5"
@@ -96,7 +104,9 @@
             </Button>
         </StackPanel>
 
-        <ContentControl Grid.Column="1" Content="{Binding CurrentView}"/>
+        <ContentControl Grid.Row="0" Grid.Column="1" Content="{Binding CurrentView}"/>
+
+        <local:StatusBarView Grid.Row="1" Grid.Column="1" DataContext="{Binding StatusBar}"/>
 
     </Grid>
 </Window>

@@ -115,6 +115,7 @@
   "backupIntervalMinutes": 10,
   "backupRetryIntervalMinutes": 3,
   "waitBeforeBackup": 60,
+  "updateCheckIntervalMinutes": 5,
   "appId": 2430930,
   "messageTimers": [ 300, 300, 240, 60 ],
   "messageTexts": [ "15 minutes", "10 minutes", "5 minutes", "1 minute" ],

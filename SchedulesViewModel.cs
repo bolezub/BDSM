@@ -107,6 +107,7 @@ namespace BDSM
                 string updatedJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
                 File.WriteAllText("config.json", updatedJson);
                 TaskSchedulerService.ClearLastRunHistory();
+                TaskSchedulerService.UpdateNextScheduledTask(); // <-- ADD THIS LINE
                 MessageBox.Show("Schedules saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (System.Exception ex)
