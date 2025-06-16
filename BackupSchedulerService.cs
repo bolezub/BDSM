@@ -44,7 +44,7 @@ namespace BDSM
                 {
                     // If we are clear to run, perform the backup.
                     System.Diagnostics.Debug.WriteLine("Starting scheduled backup...");
-                    var activeServers = _appViewModel.Servers.Where(s => s.IsActive).ToList();
+                    var activeServers = _appViewModel.Clusters.SelectMany(c => c.Servers).Where(s => s.IsActive).ToList();
                     await BackupManager.PerformBackupAsync(activeServers, _config);
                     System.Diagnostics.Debug.WriteLine("Scheduled backup finished.");
 

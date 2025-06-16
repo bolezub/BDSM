@@ -44,7 +44,7 @@
             <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock Text="Players:" Foreground="LightGray" HorizontalAlignment="Center"/>
                 <TextBlock Foreground="White" FontSize="20" HorizontalAlignment="Center">
-                     <Run Text="{Binding CurrentPlayers}"/>/<Run Text="{Binding MaxPlayers}"/>
+                     <Run Text="{Binding CurrentPlayers}"/>/<Run Text="60"/>
                 </TextBlock>
             </StackPanel>
 
@@ -55,7 +55,7 @@
 
             <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="20,0" HorizontalAlignment="Center">
                 <TextBlock Text="RAM" Foreground="LightGray"/>
-                <TextBlock Text="{Binding RamUsage, StringFormat='{}{0} GB'}" Foreground="White" FontSize="16"/>
+                <TextBlock Text="{Binding RamUsage, StringFormat='{}{0:F2}%'}" Foreground="White" FontSize="16"/>
             </StackPanel>
 
             <Button Grid.Column="4" 
@@ -78,16 +78,19 @@
                 </lvc:CartesianChart>
             </Button>
 
-            <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Style="{DynamicResource MaterialDesignFloatingActionMiniButton}" Margin="5" ToolTip="Start"
-                        Command="{Binding StartServerCommand}">
-                    <materialDesign:PackIcon Kind="Play" />
-                </Button>
-                <Button Style="{DynamicResource MaterialDesignFloatingActionMiniButton}" Margin="5" ToolTip="Stop"
-                        Command="{Binding StopServerCommand}">
-                    <materialDesign:PackIcon Kind="Stop" />
-                </Button>
-            </StackPanel>
+            <Menu Grid.Column="5" VerticalAlignment="Center" Background="Transparent">
+                <MenuItem Header="{materialDesign:PackIcon Kind=DotsVertical, Size=24}" ToolTip="Server Actions">
+                    <MenuItem Header="Start" Command="{Binding StartServerCommand}"/>
+                    <MenuItem Header="Gracefully Stop" Command="{Binding StopServerCommand}"/>
+                    <MenuItem Header="Gracefully Restart" Command="{Binding RestartServerCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="Emergency Stop" Command="{Binding EmergencyStopCommand}"/>
+                    <MenuItem Header="Save World" Command="{Binding SaveWorldCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="Send Message..." Command="{Binding SendMessageCommand}"/>
+                    <MenuItem Header="Send RCON Command..." Command="{Binding SendGenericRconCommand}"/>
+                </MenuItem>
+            </Menu>
         </Grid>
     </Border>
 </UserControl>

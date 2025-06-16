@@ -6,6 +6,9 @@ public class ServerConfig
     [JsonProperty("name")]
     public string Name { get; set; } = string.Empty;
 
+    [JsonProperty("isClubArk")]
+    public bool IsClubArk { get; set; } = false;
+
     [JsonProperty("installDir")]
     public string InstallDir { get; set; } = string.Empty;
 

@@ -82,7 +82,7 @@ namespace BDSM
                     {
                         _lastRunTimestamps[taskToRun.Id] = thisRunInstance;
                         System.Diagnostics.Debug.WriteLine($"Executing scheduled task: {taskToRun.Name} of type {taskToRun.TaskType}");
-                        var activeServers = _appViewModel.Servers.Where(s => s.IsActive).ToList();
+                        var activeServers = _appViewModel.Clusters.SelectMany(c => c.Servers).Where(s => s.IsActive).ToList();
                         switch (taskToRun.TaskType)
                         {
                             case ScheduledTaskType.DailyReboot:

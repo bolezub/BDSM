@@ -6,113 +6,121 @@
              xmlns:local="clr-namespace:BDSM"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              mc:Ignorable="d" 
-             d:DesignHeight="800" d:DesignWidth="800">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="20">
-        <StackPanel>
-            <TextBlock Text="Global Settings" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,20"/>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" MinWidth="120"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+             d:DesignHeight="800" d:DesignWidth="1200">
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="SteamCMD Path:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SteamCMDPath}" VerticalAlignment="Center" Margin="0,10"/>
-
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Backup Path:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BackupPath}" VerticalAlignment="Center" Margin="0,10"/>
-
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="Server IP:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ServerIP}" VerticalAlignment="Center" Margin="0,10"/>
-
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="RCON Password:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding RconPassword}" VerticalAlignment="Center" Margin="0,10"/>
-            </Grid>
-
-            <TextBlock Text="Server Settings" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,40,0,20"/>
-
-            <TextBlock Text="Select a server to edit:" Foreground="LightGray"/>
-            <ListBox ItemsSource="{Binding Servers}"
-                     SelectedItem="{Binding SelectedServer}"
+        <StackPanel Grid.Column="0" Margin="0,0,20,0">
+            <TextBlock Text="Clusters" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,20"/>
+            <ListBox ItemsSource="{Binding Clusters}"
+                     SelectedItem="{Binding SelectedCluster}"
                      DisplayMemberPath="Name"
-                     Margin="0,5,0,5"/>
-
-            <StackPanel Orientation="Horizontal" Margin="0,5,0,20">
-                <Button Content="Add New Server" 
-                        Command="{Binding AddServerCommand}"
-                        Style="{DynamicResource MaterialDesignFlatButton}"
-                        Margin="0,0,10,0"/>
-                <Button Content="Remove Selected Server" 
-                        Command="{Binding RemoveServerCommand}"
-                        Style="{DynamicResource MaterialDesignFlatButton}"
-                        Foreground="Red"/>
+                     Height="Auto" MaxHeight="600"/>
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Button Content="Add Cluster" Command="{Binding AddClusterCommand}" Style="{DynamicResource MaterialDesignFlatButton}"/>
+                <Button Content="Remove Cluster" Command="{Binding RemoveClusterCommand}" Style="{DynamicResource MaterialDesignFlatButton}" Foreground="Red" Margin="10,0,0,0"/>
             </StackPanel>
-
-            <GroupBox Header="Selected Server Details"
-                      materialDesign:ThemeAssist.Theme="Dark"
-                      Padding="10"
-                      IsEnabled="{Binding IsServerSelected}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" MinWidth="120"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Server Name:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedServer.Name, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10"/>
-
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Install Directory:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedServer.InstallDir, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10"/>
-
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Map:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AvailableMaps}" SelectedItem="{Binding SelectedServer.MapFolder}" VerticalAlignment="Center" Margin="0,10"/>
-
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Game Port:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedServer.Port, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10"/>
-
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Query Port:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedServer.QueryPort, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10"/>
-
-                    <TextBlock Grid.Row="5" Grid.Column="0" Text="RCON Port:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                    <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding SelectedServer.RconPort, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10"/>
-
-                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Map-Specific Mods:" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                    <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding SelectedServerModsString, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10" ToolTip="Comma-separated list of mod IDs"/>
-
-                    <TextBlock Grid.Row="7" Grid.Column="0" Text="Memory Threshold (GB):" VerticalAlignment="Center" Foreground="LightGray" Margin="0,10,10,10"/>
-                    <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding SelectedServer.MemoryThresholdGB, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10"/>
-
-                    <CheckBox Grid.Row="8" Grid.Column="1" IsChecked="{Binding SelectedServer.DiscordNotificationsEnabled}" Content="Discord Notifications Enabled" Margin="0,10" Foreground="LightGray"/>
-
-                    <CheckBox Grid.Row="9" Grid.Column="0" IsChecked="{Binding SelectedServer.Active}" Content="Active" Margin="0,10,10,10" Foreground="LightGray"/>
-                    <CheckBox Grid.Row="9" Grid.Column="1" IsChecked="{Binding SelectedServer.IsHidden}" Content="Hidden" Margin="0,10,10,10" Foreground="LightGray"/>
-
-                </Grid>
-            </GroupBox>
-
-            <Button Content="Save All Settings"
-                    Command="{Binding SaveSettingsCommand}"
-                    HorizontalAlignment="Left"
-                    Margin="0,30,0,0"
-                    Style="{DynamicResource MaterialDesignRaisedButton}"/>
         </StackPanel>
-    </ScrollViewer>
+
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <GroupBox Header="Cluster Details" IsEnabled="{Binding IsClusterSelected}" Padding="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="120"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Cluster Name:" VerticalAlignment="Center" Margin="0,10,10,10"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedCluster.Name, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Cluster ID:" VerticalAlignment="Center" Margin="0,10,10,10"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedCluster.ClusterId, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Main Mod List:" VerticalAlignment="Center" Margin="0,10,10,10"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedClusterMainModList, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,10" ToolTip="Comma-separated list of mod IDs for the whole cluster."/>
+                    </Grid>
+                </GroupBox>
+
+                <GroupBox Header="Servers in this Cluster" Margin="0,20,0,0" IsEnabled="{Binding IsClusterSelected}" Padding="10">
+                    <StackPanel>
+                        <ListBox ItemsSource="{Binding ServersInSelectedCluster}"
+                                 SelectedItem="{Binding SelectedServer}"
+                                 DisplayMemberPath="Name"
+                                 Height="150"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Content="Add Server" Command="{Binding AddServerCommand}" Style="{DynamicResource MaterialDesignFlatButton}"/>
+                            <Button Content="Remove Server" Command="{Binding RemoveServerCommand}" Style="{DynamicResource MaterialDesignFlatButton}" Foreground="Red" Margin="10,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="Selected Server Details" Margin="0,20,0,0" IsEnabled="{Binding IsServerSelected}" Padding="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Server Name:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedServer.Name, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Install Directory:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedServer.InstallDir, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Map:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AvailableMaps}" SelectedItem="{Binding SelectedServer.MapFolder}" VerticalAlignment="Center" Margin="0,5"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Game Port:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedServer.Port, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Query Port:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedServer.QueryPort, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="RCON Port:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding SelectedServer.RconPort, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Map-Specific Mods:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding SelectedServerMapSpecificMods, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5" ToolTip="Mods to ADD to the main cluster mod list for this server only."/>
+
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Memory Threshold (GB):" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                        <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding SelectedServer.MemoryThresholdGB, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                        <CheckBox Grid.Row="8" Grid.Column="0" IsChecked="{Binding SelectedServer.IsClubArk}" Content="Is ClubArk Server" Margin="0,10,10,10" ToolTip="ClubArk servers use ONLY their map-specific mods and ignore the main cluster mod list."/>
+                        <CheckBox Grid.Row="8" Grid.Column="1" IsChecked="{Binding SelectedServer.DiscordNotificationsEnabled}" Content="Discord Notifications Enabled" Margin="0,10,10,10"/>
+
+                        <CheckBox Grid.Row="9" Grid.Column="0" IsChecked="{Binding SelectedServer.Active}" Content="Active" Margin="0,10,10,10" ToolTip="Active servers are monitored and included in automated tasks."/>
+                        <CheckBox Grid.Row="9" Grid.Column="1" IsChecked="{Binding SelectedServer.IsHidden}" Content="Hidden" Margin="0,10,10,10" ToolTip="Hidden servers do not show up on the main dashboard."/>
+                    </Grid>
+                </GroupBox>
+
+                <Button Content="Save All Settings"
+                        Command="{Binding SaveSettingsCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,30,0,0"
+                        Style="{DynamicResource MaterialDesignRaisedButton}"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

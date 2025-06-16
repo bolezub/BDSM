@@ -22,6 +22,7 @@ namespace BDSM
     public class ServerViewModel : BaseViewModel
     {
         private readonly ServerConfig _serverConfig;
+        private readonly ClusterConfig _clusterConfig;
         private readonly GlobalConfig _globalConfig;
 
         private PerformanceCounter? _cpuCounter;
@@ -44,12 +45,17 @@ namespace BDSM
 
         public ICommand StartServerCommand { get; }
         public ICommand StopServerCommand { get; }
+        public ICommand RestartServerCommand { get; }
+        public ICommand EmergencyStopCommand { get; }
+        public ICommand SaveWorldCommand { get; }
+        public ICommand SendMessageCommand { get; }
+        public ICommand SendGenericRconCommand { get; }
         public ICommand ShowGraphDetailCommand { get; }
 
         public string ServerName => _serverConfig.Name.Replace("ASA ", "");
         public int RconPort => _serverConfig.RconPort;
         public string InstallDir => _serverConfig.InstallDir;
-        public string MapFolder => _serverConfig.MapFolder; // <-- THIS IS THE NEW LINE THAT FIXES THE ERROR
+        public string MapFolder => _serverConfig.MapFolder;
         public bool DiscordNotificationsEnabled => _serverConfig.DiscordNotificationsEnabled;
         public bool IsActive => _serverConfig.Active;
 
@@ -125,30 +131,72 @@ namespace BDSM
             }
         }
 
-        public ServerViewModel(ServerConfig serverConfig, GlobalConfig globalConfig)
+        public ServerViewModel(ServerConfig serverConfig, ClusterConfig clusterConfig, GlobalConfig globalConfig)
         {
             _serverConfig = serverConfig;
+            _clusterConfig = clusterConfig;
             _globalConfig = globalConfig;
             MaxRam = serverConfig.MemoryThresholdGB;
-            StartServerCommand = new RelayCommand(_ => StartServer(), _ => Status == "Stopped");
-            StopServerCommand = new RelayCommand(async _ => await StopServer(), _ => Status == "Running");
+
             ShowGraphDetailCommand = new RelayCommand(_ => ShowGraphDetail());
 
-            Series = new ObservableCollection<ISeries>();
+            StartServerCommand = new RelayCommand(
+                _ => StartServer(),
+                _ => Status == "Stopped" && !TaskSchedulerService.IsMajorOperationInProgress);
 
+            StopServerCommand = new RelayCommand(
+                async _ => await UpdateManager.PerformMaintenanceShutdownAsync(new List<ServerViewModel> { this }, _globalConfig),
+                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+
+            RestartServerCommand = new RelayCommand(
+                async _ => await UpdateManager.PerformScheduledRebootAsync(new List<ServerViewModel> { this }, _globalConfig),
+                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+
+            EmergencyStopCommand = new RelayCommand(
+                async _ => await EmergencyStopServer(),
+                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+
+            SaveWorldCommand = new RelayCommand(
+                async _ => await SendRconCommandAsync("SaveWorld"),
+                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+
+            SendMessageCommand = new RelayCommand(
+                async _ => await ShowMessageDialog(isGeneric: false),
+                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+
+            SendGenericRconCommand = new RelayCommand(
+                async _ => await ShowMessageDialog(isGeneric: true),
+                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+
+
+            Series = new ObservableCollection<ISeries>();
             XAxes = new Axis[]
             {
                 new Axis { Labeler = value => value >= 0 ? new DateTime((long)value).ToString("HH:mm") : "", UnitWidth = TimeSpan.FromHours(1).Ticks }
             };
-
             YAxes = new Axis[]
             {
                 new Axis { Name = "CPU (%)", MinLimit = 0, MaxLimit = 100 },
                 new Axis { Name = "RAM (GB)", Position = LiveChartsCore.Measure.AxisPosition.End, MinLimit = 0 }
             };
 
-            _ = LoadInitialDataAsync();
-            Task.Run(() => MonitorServerAsync());
+            // --- THIS IS THE ROBUST STARTUP LOGIC ---
+            // It runs all background work in a single fire-and-forget task
+            Task.Run(async () =>
+            {
+                // 1. Load initial data, but wrap it in a try-catch so an error doesn't stop everything.
+                try
+                {
+                    await LoadInitialDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"!!! ERROR during initial data load for {ServerName}: {ex.Message}");
+                }
+
+                // 2. Start the perpetual monitoring task. This will now always run.
+                await MonitorServerAsync();
+            });
         }
 
         private async Task LoadInitialDataAsync()
@@ -182,6 +230,22 @@ namespace BDSM
             await CheckForUpdate();
         }
 
+        private async Task ShowMessageDialog(bool isGeneric)
+        {
+            var windowTitle = isGeneric ? "Send RCON Command" : "Send In-Game Message";
+            var messageHint = isGeneric ? "Enter RCON command (e.g., ListPlayers)" : "Enter message to send to the server";
+
+            var messageWindow = new MessageWindow(windowTitle, messageHint);
+
+            bool? result = messageWindow.ShowDialog();
+
+            if (result == true && !string.IsNullOrWhiteSpace(messageWindow.MessageText))
+            {
+                var commandToSend = isGeneric ? messageWindow.MessageText : $"ServerChat {messageWindow.MessageText}";
+                await SendRconCommandAsync(commandToSend);
+            }
+        }
+
         private void ShowGraphDetail()
         {
             var detailViewModel = new GraphDetailViewModel(this.ServerName, this.Series, this.XAxes, this.YAxes);
@@ -202,12 +266,30 @@ namespace BDSM
         public void StartServer()
         {
             Status = "Starting";
+
+            var mods = new List<int>();
+            if (_serverConfig.IsClubArk)
+            {
+                mods.AddRange(_serverConfig.MapSpecificMods);
+            }
+            else
+            {
+                mods.AddRange(_clusterConfig.MainModList);
+                mods.AddRange(_serverConfig.MapSpecificMods);
+            }
+
+            var distinctMods = mods.Distinct();
+            string modArgument = distinctMods.Any() ? $"-mods={string.Join(",", distinctMods)}" : "";
+
             string arguments = _globalConfig.StartArgumentsTemplate
                 .Replace("{mapFolder}", _serverConfig.MapFolder)
                 .Replace("{serverIP}", _globalConfig.ServerIP)
                 .Replace("{port}", _serverConfig.Port.ToString())
-                .Replace("{queryPort}", _serverConfig.QueryPort.ToString());
-            arguments += " " + _globalConfig.ModArguments;
+                .Replace("{queryPort}", _serverConfig.QueryPort.ToString())
+                .Replace("{clusterId}", _clusterConfig.ClusterId);
+
+            arguments += " " + modArgument;
+
             var processStartInfo = new ProcessStartInfo
             {
                 FileName = _serverConfig.StartExecutable,
@@ -243,17 +325,13 @@ namespace BDSM
             }
         }
 
-        private async Task StopServer()
+        public async Task EmergencyStopServer()
         {
             if (Status != "Running") return;
             Status = "Stopping";
-            RCON? rconClient = null;
             try
             {
-                var serverEndpoint = new IPEndPoint(IPAddress.Parse(_globalConfig.ServerIP), _serverConfig.RconPort);
-                rconClient = new RCON(serverEndpoint, _globalConfig.RconPassword);
-                await rconClient.ConnectAsync();
-                await rconClient.SendCommandAsync("DoExit");
+                await SendRconCommandAsync("DoExit");
             }
             catch (Exception ex)
             {
@@ -262,6 +340,24 @@ namespace BDSM
                 {
                     _serverProcess.Kill();
                 }
+            }
+        }
+
+        public async Task SendRconCommandAsync(string command)
+        {
+            if (Status != "Running" && Status != "Stopping") return;
+
+            RCON? rconClient = null;
+            try
+            {
+                var serverEndpoint = new IPEndPoint(IPAddress.Parse(_globalConfig.ServerIP), _serverConfig.RconPort);
+                rconClient = new RCON(serverEndpoint, _globalConfig.RconPassword);
+                await rconClient.ConnectAsync();
+                await rconClient.SendCommandAsync(command);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"RCON command '{command}' to server {ServerName} failed: {ex.Message}.");
             }
             finally
             {
@@ -279,10 +375,7 @@ namespace BDSM
 
             if (serverProcess == null)
             {
-                if (Status != "Stopping" && Status != "Stopped")
-                {
-                    Status = "Stopped";
-                }
+                Status = "Stopped";
                 Pid = string.Empty;
                 CurrentPlayers = 0;
                 OnlinePlayers.Clear();
@@ -293,8 +386,6 @@ namespace BDSM
                 _cpuCounter = null;
                 return;
             }
-
-            if (Status == "Stopping") return;
 
             _serverProcess = serverProcess;
             Pid = $"PID {serverProcess.Id}";
@@ -310,7 +401,7 @@ namespace BDSM
 
                 bool wasJustStarted = (Status == "Starting");
 
-                if (Status != "Update Pending")
+                if (Status != "Update Pending" && Status != "Stopping")
                 {
                     Status = "Running";
                 }
@@ -326,7 +417,7 @@ namespace BDSM
             }
             catch (SocketException)
             {
-                if (Status != "Update Pending")
+                if (Status != "Starting" && Status != "Stopping" && Status != "Update Pending")
                 {
                     Status = "Starting";
                 }
@@ -336,7 +427,7 @@ namespace BDSM
             catch (Exception ex)
             {
                 Debug.WriteLine($"RCON check for {_serverConfig.Name} FAILED with generic Exception: {ex.Message}");
-                if (Status != "Update Pending")
+                if (Status != "Starting" && Status != "Stopping" && Status != "Update Pending")
                 {
                     Status = "Starting";
                 }

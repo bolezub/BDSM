@@ -5,8 +5,8 @@ namespace BDSM
 {
     public class GlobalConfig
     {
-        [JsonProperty("servers")]
-        public List<ServerConfig> Servers { get; set; } = new List<ServerConfig>();
+        [JsonProperty("clusters")]
+        public List<ClusterConfig> Clusters { get; set; } = new List<ClusterConfig>();
 
         [JsonProperty("schedules")]
         public List<ScheduledTask> Schedules { get; set; } = new List<ScheduledTask>();
@@ -17,7 +17,6 @@ namespace BDSM
         [JsonProperty("backupRetryIntervalMinutes")]
         public int BackupRetryIntervalMinutes { get; set; } = 5;
 
-        // --- NEW PROPERTY ---
         [JsonProperty("updateCheckIntervalMinutes")]
         public int UpdateCheckIntervalMinutes { get; set; } = 15; // Default to 15 minutes
 

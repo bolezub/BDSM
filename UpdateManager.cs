@@ -33,16 +33,51 @@ namespace BDSM
 
         public static async Task PerformMaintenanceShutdownAsync(List<ServerViewModel> activeServers, GlobalConfig config)
         {
-            var shutdownTasks = activeServers.Select(server => HandleSingleServerMaintenance(server, config)).ToList();
-            await Task.WhenAll(shutdownTasks);
-            Debug.WriteLine("All maintenance shutdown tasks have been processed.");
+            if (TaskSchedulerService.IsMajorOperationInProgress)
+            {
+                Debug.WriteLine("Maintenance shutdown skipped: A major operation is already in progress.");
+                return;
+            }
+
+            TaskSchedulerService.SetOperationLock();
+            try
+            {
+                var shutdownTasks = activeServers
+                    .Where(s => s.Status == "Running")
+                    .Select(server => HandleSingleServerMaintenance(server, config))
+                    .ToList();
+
+                if (shutdownTasks.Any())
+                {
+                    await Task.WhenAll(shutdownTasks);
+                    Debug.WriteLine("All maintenance shutdown tasks have been processed.");
+                }
+            }
+            finally
+            {
+                TaskSchedulerService.ReleaseOperationLock();
+            }
         }
 
         public static async Task PerformScheduledRebootAsync(List<ServerViewModel> activeServers, GlobalConfig config)
         {
-            var rebootTasks = activeServers.Select(server => HandleSingleServerUpdate(server, config, shouldRestart: true)).ToList();
-            await Task.WhenAll(rebootTasks);
-            Debug.WriteLine("All scheduled reboot tasks have been processed.");
+            if (TaskSchedulerService.IsMajorOperationInProgress)
+            {
+                Debug.WriteLine("Scheduled reboot skipped: A major operation is already in progress.");
+                return;
+            }
+
+            TaskSchedulerService.SetOperationLock();
+            try
+            {
+                var rebootTasks = activeServers.Select(server => HandleSingleServerUpdate(server, config, shouldRestart: true)).ToList();
+                await Task.WhenAll(rebootTasks);
+                Debug.WriteLine("All scheduled reboot tasks have been processed.");
+            }
+            finally
+            {
+                TaskSchedulerService.ReleaseOperationLock();
+            }
         }
 
         #endregion

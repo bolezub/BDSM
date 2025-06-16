@@ -41,7 +41,7 @@ namespace BDSM
                     System.Diagnostics.Debug.WriteLine("Checking all servers for updates...");
                     await _appViewModel.CheckAllServersForUpdate();
 
-                    var serversToUpdate = _appViewModel.Servers.Where(s => s.IsUpdateAvailable).ToList();
+                    var serversToUpdate = _appViewModel.Clusters.SelectMany(c => c.Servers).Where(s => s.IsUpdateAvailable).ToList();
 
                     if (serversToUpdate.Any())
                     {

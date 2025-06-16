@@ -1,26 +1,40 @@
-﻿using System;
+﻿using CoreRCON;
+using CoreRCON.Parsers.Standard;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using BDSM;
-using Newtonsoft.Json;
 
 namespace BDSM
 {
     public class SettingsViewModel : BaseViewModel
     {
         private readonly GlobalConfig _config;
+        private ClusterConfig? _selectedCluster;
         private ServerConfig? _selectedServer;
 
-        public string SteamCMDPath { get; set; }
-        public string BackupPath { get; set; }
-        public string ServerIP { get; set; }
-        public string RconPassword { get; set; }
+        public ObservableCollection<ClusterConfig> Clusters { get; set; }
 
-        public ObservableCollection<ServerConfig> Servers { get; set; }
+        public ClusterConfig? SelectedCluster
+        {
+            get => _selectedCluster;
+            set
+            {
+                _selectedCluster = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsClusterSelected));
+                OnPropertyChanged(nameof(SelectedClusterMainModList));
+
+                // --- ADD THIS LINE to notify the server list to update ---
+                OnPropertyChanged(nameof(ServersInSelectedCluster));
+
+                SelectedServer = null;
+            }
+        }
+
         public ServerConfig? SelectedServer
         {
             get => _selectedServer;
@@ -29,25 +43,58 @@ namespace BDSM
                 _selectedServer = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsServerSelected));
-                // This is new - it tells the mods textbox to update when the selection changes.
-                OnPropertyChanged(nameof(SelectedServerModsString));
+                OnPropertyChanged(nameof(SelectedServerMapSpecificMods));
             }
         }
 
+        public bool IsClusterSelected => SelectedCluster != null;
         public bool IsServerSelected => SelectedServer != null;
 
-        // --- This is the new proxy property for the mods list ---
-        public string SelectedServerModsString
+        // This property gets the server list ONLY from the currently selected cluster
+        public ObservableCollection<ServerConfig>? ServersInSelectedCluster
         {
-            get
-            {
-                // If a server is selected, convert its list of mod IDs to a comma-separated string.
-                if (SelectedServer == null) return "";
-                return string.Join(",", SelectedServer.MapSpecificMods);
-            }
+            get => SelectedCluster != null ? new ObservableCollection<ServerConfig>(SelectedCluster.Servers) : null;
             set
             {
-                // When the user types in the textbox, convert the string back to a list of numbers.
+                if (SelectedCluster != null)
+                {
+                    SelectedCluster.Servers = value?.ToList() ?? new List<ServerConfig>();
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        #region Proxy Properties for Mod Lists
+
+        // Proxy for the selected cluster's main mod list
+        public string SelectedClusterMainModList
+        {
+            get => SelectedCluster != null ? string.Join(",", SelectedCluster.MainModList) : "";
+            set
+            {
+                if (SelectedCluster != null)
+                {
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        SelectedCluster.MainModList.Clear();
+                    }
+                    else
+                    {
+                        SelectedCluster.MainModList = value.Split(',')
+                            .Select(part => int.TryParse(part.Trim(), out int modId) ? modId : -1)
+                            .Where(modId => modId != -1)
+                            .ToList();
+                    }
+                }
+            }
+        }
+
+        // Proxy for the selected server's map-specific mod list
+        public string SelectedServerMapSpecificMods
+        {
+            get => SelectedServer != null ? string.Join(",", SelectedServer.MapSpecificMods) : "";
+            set
+            {
                 if (SelectedServer != null)
                 {
                     if (string.IsNullOrWhiteSpace(value))
@@ -56,22 +103,17 @@ namespace BDSM
                     }
                     else
                     {
-                        // This will safely parse the numbers and ignore any invalid text
-                        var newModIds = new List<int>();
-                        var parts = value.Split(',');
-                        foreach (var part in parts)
-                        {
-                            if (int.TryParse(part.Trim(), out int modId))
-                            {
-                                newModIds.Add(modId);
-                            }
-                        }
-                        SelectedServer.MapSpecificMods = newModIds;
+                        SelectedServer.MapSpecificMods = value.Split(',')
+                            .Select(part => int.TryParse(part.Trim(), out int modId) ? modId : -1)
+                            .Where(modId => modId != -1)
+                            .ToList();
                     }
+                    OnPropertyChanged();
                 }
             }
         }
-        // --------------------------------------------------------
+
+        #endregion
 
         public List<string> AvailableMaps { get; } = new List<string>
         {
@@ -79,71 +121,70 @@ namespace BDSM
         };
 
         public ICommand SaveSettingsCommand { get; }
+        public ICommand AddClusterCommand { get; }
+        public ICommand RemoveClusterCommand { get; }
         public ICommand AddServerCommand { get; }
         public ICommand RemoveServerCommand { get; }
 
         public SettingsViewModel(GlobalConfig globalConfig)
         {
             _config = globalConfig;
-
-            SteamCMDPath = _config.SteamCMDPath;
-            BackupPath = _config.BackupPath;
-            ServerIP = _config.ServerIP;
-            RconPassword = _config.RconPassword;
-
-            Servers = new ObservableCollection<ServerConfig>(_config.Servers);
+            Clusters = new ObservableCollection<ClusterConfig>(_config.Clusters);
 
             SaveSettingsCommand = new RelayCommand(_ => SaveSettings());
-            AddServerCommand = new RelayCommand(_ => AddServer());
+            AddClusterCommand = new RelayCommand(_ => AddCluster());
+            RemoveClusterCommand = new RelayCommand(_ => RemoveCluster(), _ => IsClusterSelected);
+            AddServerCommand = new RelayCommand(_ => AddServer(), _ => IsClusterSelected);
             RemoveServerCommand = new RelayCommand(_ => RemoveServer(), _ => IsServerSelected);
+        }
+
+        private void AddCluster()
+        {
+            var newCluster = new ClusterConfig();
+            Clusters.Add(newCluster);
+            SelectedCluster = newCluster;
+        }
+
+        private void RemoveCluster()
+        {
+            if (SelectedCluster == null) return;
+            var result = MessageBox.Show($"Are you sure you want to remove the cluster '{SelectedCluster.Name}' and all its servers?", "Confirm Deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result == MessageBoxResult.Yes)
+            {
+                Clusters.Remove(SelectedCluster);
+            }
         }
 
         private void AddServer()
         {
-            var newServer = new ServerConfig
-            {
-                Name = "New Server",
-                InstallDir = @"D:\Servers\NewServer",
-                MapFolder = "TheIsland_WP",
-                Port = 1500,
-                QueryPort = 15001,
-                RconPort = 15100,
-                Active = true
-            };
-            Servers.Add(newServer);
+            if (SelectedCluster == null) return;
+            var newServer = new ServerConfig { Name = "New Server", Active = true, MapFolder = "TheIsland_WP" };
+            SelectedCluster.Servers.Add(newServer);
+            OnPropertyChanged(nameof(ServersInSelectedCluster)); // Notify UI the collection has changed
             SelectedServer = newServer;
         }
 
         private void RemoveServer()
         {
-            if (SelectedServer == null) return;
-
-            var result = MessageBox.Show(
-                $"Are you sure you want to remove the server '{SelectedServer.Name}'?\nThis action cannot be undone.",
-                "Confirm Deletion",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
+            if (SelectedCluster == null || SelectedServer == null) return;
+            var result = MessageBox.Show($"Are you sure you want to remove the server '{SelectedServer.Name}'?", "Confirm Deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (result == MessageBoxResult.Yes)
             {
-                Servers.Remove(SelectedServer);
+                SelectedCluster.Servers.Remove(SelectedServer);
+                OnPropertyChanged(nameof(ServersInSelectedCluster)); // Notify UI the collection has changed
             }
         }
 
         private void SaveSettings()
         {
-            _config.SteamCMDPath = this.SteamCMDPath;
-            _config.BackupPath = this.BackupPath;
-            _config.ServerIP = this.ServerIP;
-            _config.RconPassword = this.RconPassword;
-
-            _config.Servers = this.Servers.ToList();
+            // The collections are already updated by binding, so we just need to save the main config object.
+            _config.Clusters = Clusters.ToList();
 
             try
             {
                 string updatedJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
                 File.WriteAllText("config.json", updatedJson);
-                MessageBox.Show("Settings saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Settings saved successfully! You may need to restart the application for all changes to take effect.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (System.Exception ex)
             {

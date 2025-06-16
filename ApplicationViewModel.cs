@@ -10,7 +10,7 @@ namespace BDSM
 {
     public class ApplicationViewModel : BaseViewModel
     {
-        public ObservableCollection<ServerViewModel> Servers { get; set; }
+        public ObservableCollection<ClusterViewModel> Clusters { get; set; }
         private GlobalConfig? _config;
 
         private object? _currentView;
@@ -27,7 +27,6 @@ namespace BDSM
         public ICommand ShowBackupsCommand { get; }
         public StatusBarViewModel StatusBar { get; }
 
-
         public object? CurrentView
         {
             get => _currentView;
@@ -37,12 +36,13 @@ namespace BDSM
         public ApplicationViewModel()
         {
             StatusBar = new StatusBarViewModel();
-            Servers = new ObservableCollection<ServerViewModel>();
+            Clusters = new ObservableCollection<ClusterViewModel>();
 
             ShowDashboardCommand = new RelayCommand(_ => CurrentView = _dashboardView);
             ShowSettingsCommand = new RelayCommand(_ => {
                 if (_settingsView == null && _config != null)
                 {
+                    // This will need to be updated later when we redesign the settings page
                     _settingsView = new SettingsView { DataContext = new SettingsViewModel(_config) };
                 }
                 CurrentView = _settingsView;
@@ -54,11 +54,11 @@ namespace BDSM
                 }
                 CurrentView = _schedulesView;
             });
-
             ShowBackupsCommand = new RelayCommand(_ => {
                 if (_backupsView == null && _config != null)
                 {
-                    _backupsView = new BackupsView { DataContext = new BackupViewModel(_config, Servers) };
+                    var allServers = Clusters.SelectMany(c => c.Servers);
+                    _backupsView = new BackupsView { DataContext = new BackupViewModel(_config, allServers) };
                 }
                 CurrentView = _backupsView;
             });
@@ -72,18 +72,25 @@ namespace BDSM
             {
                 _config = JsonConvert.DeserializeObject<GlobalConfig>(File.ReadAllText("config.json"));
 
-                if (_config != null && _config.Servers != null)
+                if (_config != null && _config.Clusters != null)
                 {
+                    // New loading logic for clusters
+                    foreach (var clusterConfig in _config.Clusters)
+                    {
+                        var clusterVM = new ClusterViewModel(clusterConfig, _config);
+                        foreach (var serverConfig in clusterConfig.Servers)
+                        {
+                            var serverVM = new ServerViewModel(serverConfig, clusterConfig, _config);
+                            clusterVM.Servers.Add(serverVM);
+                        }
+                        Clusters.Add(clusterVM);
+                    }
+
+                    // Start background services
                     DataLogger.InitializeDatabase(_config.BackupPath);
                     TaskSchedulerService.Start(_config, this);
                     BackupSchedulerService.Start(_config, this);
-                    UpdateSchedulerService.Start(_config, this); // <-- ADD THIS LINE
-
-                    foreach (var serverConfig in _config.Servers)
-                    {
-                        var svm = new ServerViewModel(serverConfig, _config);
-                        Servers.Add(svm);
-                    }
+                    UpdateSchedulerService.Start(_config, this);
                 }
             }
 
@@ -91,37 +98,24 @@ namespace BDSM
             CurrentView = _dashboardView;
         }
 
-        private void ShowNotification(string message, int durationSeconds = 5)
-        {
-            System.Diagnostics.Debug.WriteLine($"NOTIFICATION: {message}");
-        }
-
         public async Task CheckAllServersForUpdate()
         {
-            ShowNotification("Checking all servers for updates...", 2);
-            var updateTasks = Servers.Select(svm => svm.CheckForUpdate()).ToList();
+            var allServers = Clusters.SelectMany(c => c.Servers);
+            var updateTasks = allServers.Select(svm => svm.CheckForUpdate()).ToList();
             await Task.WhenAll(updateTasks);
-            ShowNotification("Update check finished.");
         }
 
         private async Task StartUpdate()
         {
             if (_config == null) return;
-
-            var serversToUpdate = Servers.Where(s => s.IsUpdateAvailable).ToList();
-
-            if (!serversToUpdate.Any())
-            {
-                ShowNotification("No servers require an update.");
-                return;
-            }
+            var allServers = Clusters.SelectMany(c => c.Servers);
+            var serversToUpdate = allServers.Where(s => s.IsUpdateAvailable).ToList();
+            if (!serversToUpdate.Any()) return;
 
             TaskSchedulerService.SetOperationLock();
             try
             {
-                ShowNotification($"Starting update process for {serversToUpdate.Count} server(s)...", 10);
                 await UpdateManager.PerformUpdateProcessAsync(serversToUpdate, _config);
-                ShowNotification("Update process complete for all servers.");
             }
             finally
             {
@@ -131,7 +125,8 @@ namespace BDSM
 
         private bool CanStartUpdate()
         {
-            return Servers.Any(s => s.IsUpdateAvailable) && !TaskSchedulerService.IsMajorOperationInProgress;
+            var allServers = Clusters.SelectMany(c => c.Servers);
+            return allServers.Any(s => s.IsUpdateAvailable) && !TaskSchedulerService.IsMajorOperationInProgress;
         }
     }
 }
