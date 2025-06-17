@@ -8,12 +8,11 @@ namespace BDSM
     {
         DailyReboot,
         MaintenanceShutdown,
-        FrequentBackup // Renamed from WeeklyBackup
+        ScheduledBackup // RENAMED from FrequentBackup
     }
 
     public class ScheduledTask : BaseViewModel
     {
-        // ... all other existing code in this file remains the same ...
         private string _name = "New Task";
         private ScheduledTaskType _taskType = ScheduledTaskType.DailyReboot;
         private TimeSpan _scheduledTime = new TimeSpan(5, 0, 0);

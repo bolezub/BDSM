@@ -57,7 +57,6 @@ namespace BDSM
 
         private void CountdownTimer_Tick(object? sender, EventArgs e)
         {
-            // First, force the UI to re-calculate the NextCalculatedRunTime property
             SelectedTask?.Refresh();
 
             if (SelectedTask?.NextCalculatedRunTime is { } nextRun)
@@ -104,11 +103,17 @@ namespace BDSM
         {
             try
             {
+                // Note: The config object is already updated via the OnScheduledTasksChanged event.
+                // We just need to serialize it to disk.
                 string updatedJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
                 File.WriteAllText("config.json", updatedJson);
+
+                // We clear history and update the next task to ensure the scheduler picks up any changes immediately.
                 TaskSchedulerService.ClearLastRunHistory();
-                TaskSchedulerService.UpdateNextScheduledTask(); // <-- ADD THIS LINE
-                MessageBox.Show("Schedules saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                TaskSchedulerService.UpdateNextScheduledTask();
+
+                // MODIFIED: Use the new notification service
+                NotificationService.ShowInfo("Schedules saved successfully!");
             }
             catch (System.Exception ex)
             {

@@ -299,5 +299,28 @@ namespace BDSM
             }
         }
         #endregion
+
+        public static async Task InstallServerAsync(ServerConfig serverConfig, GlobalConfig globalConfig)
+        {
+            Debug.WriteLine($"Starting installation for {serverConfig.Name} in {serverConfig.InstallDir}");
+
+            string steamCmdArgs = $"+login anonymous +force_install_dir \"{serverConfig.InstallDir}\" +app_update {globalConfig.AppId} validate +quit";
+
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = globalConfig.SteamCMDPath,
+                Arguments = steamCmdArgs,
+                UseShellExecute = true,
+                CreateNoWindow = false
+            };
+
+            Debug.WriteLine($"Starting SteamCMD for {serverConfig.Name}");
+            var process = Process.Start(processStartInfo);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+                Debug.WriteLine($"SteamCMD installation finished for {serverConfig.Name}.");
+            }
+        }
     }
 }

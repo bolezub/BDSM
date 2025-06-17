@@ -17,7 +17,6 @@ namespace BDSM
             _config = config;
             _appViewModel = appViewModel;
 
-            // Use a one-shot timer that reschedules itself after each operation.
             _updateTimer = new Timer(OnTimerTick, null, TimeSpan.FromMinutes(1), Timeout.InfiniteTimeSpan);
             System.Diagnostics.Debug.WriteLine($"Update scheduler started.");
         }
@@ -33,7 +32,6 @@ namespace BDSM
                 if (TaskSchedulerService.IsMajorOperationInProgress)
                 {
                     System.Diagnostics.Debug.WriteLine("Update check skipped: A major operation is in progress.");
-                    // Use the same retry interval as backups for simplicity.
                     nextInterval = TimeSpan.FromMinutes(Math.Max(1, _config.BackupRetryIntervalMinutes));
                 }
                 else
@@ -41,12 +39,15 @@ namespace BDSM
                     System.Diagnostics.Debug.WriteLine("Checking all servers for updates...");
                     await _appViewModel.CheckAllServersForUpdate();
 
-                    var serversToUpdate = _appViewModel.Clusters.SelectMany(c => c.Servers).Where(s => s.IsUpdateAvailable).ToList();
+                    // MODIFIED: Added .Where(s => s.IsInstalled) to filter out uninstalled servers
+                    var serversToUpdate = _appViewModel.Clusters
+                                                       .SelectMany(c => c.Servers)
+                                                       .Where(s => s.IsInstalled && s.IsUpdateAvailable)
+                                                       .ToList();
 
                     if (serversToUpdate.Any())
                     {
                         System.Diagnostics.Debug.WriteLine($"{serversToUpdate.Count} server(s) require an update. Starting update process...");
-                        // This will set the operation lock internally
                         await UpdateManager.PerformUpdateProcessAsync(serversToUpdate, _config);
                         System.Diagnostics.Debug.WriteLine("Automatic update process finished.");
                     }
@@ -55,11 +56,9 @@ namespace BDSM
                         System.Diagnostics.Debug.WriteLine("All servers are up-to-date.");
                     }
 
-                    // After a successful check/run, set the timer for the normal interval.
                     nextInterval = TimeSpan.FromMinutes(Math.Max(1, _config.UpdateCheckIntervalMinutes));
                 }
 
-                // Update the public property and reschedule the timer.
                 NextUpdateCheckTime = DateTime.Now.Add(nextInterval);
                 _updateTimer?.Change(nextInterval, Timeout.InfiniteTimeSpan);
                 System.Diagnostics.Debug.WriteLine($"Next update check scheduled in {nextInterval.TotalMinutes} minutes.");

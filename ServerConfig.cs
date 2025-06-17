@@ -7,16 +7,13 @@ public class ServerConfig
     public string Name { get; set; } = string.Empty;
 
     [JsonProperty("isClubArk")]
+    
     public bool IsClubArk { get; set; } = false;
-
     [JsonProperty("installDir")]
+    
     public string InstallDir { get; set; } = string.Empty;
-
-    [JsonProperty("serverExecutablePath")]
-    public string ServerExecutablePath { get; set; } = string.Empty;
-
-    [JsonProperty("startExecutable")]
-    public string StartExecutable { get; set; } = string.Empty;
+    [JsonProperty("useApiLoader")]
+    public bool UseApiLoader { get; set; } = true;
 
     [JsonProperty("mapFolder")]
     public string MapFolder { get; set; } = string.Empty;

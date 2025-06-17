@@ -58,6 +58,8 @@ namespace BDSM
         public string MapFolder => _serverConfig.MapFolder;
         public bool DiscordNotificationsEnabled => _serverConfig.DiscordNotificationsEnabled;
         public bool IsActive => _serverConfig.Active;
+        // NEW PROPERTY
+        public bool IsInstalled { get; private set; }
 
         public string Status
         {
@@ -138,11 +140,15 @@ namespace BDSM
             _globalConfig = globalConfig;
             MaxRam = serverConfig.MemoryThresholdGB;
 
+            // NEW: Calculate IsInstalled on creation
+            string keyFilePath = Path.Combine(_serverConfig.InstallDir, "ShooterGame", "Binaries", "Win64", "ArkAscendedServer.exe");
+            IsInstalled = File.Exists(keyFilePath);
+
             ShowGraphDetailCommand = new RelayCommand(_ => ShowGraphDetail());
 
             StartServerCommand = new RelayCommand(
                 _ => StartServer(),
-                _ => Status == "Stopped" && !TaskSchedulerService.IsMajorOperationInProgress);
+                _ => Status == "Stopped" && !TaskSchedulerService.IsMajorOperationInProgress && IsInstalled);
 
             StopServerCommand = new RelayCommand(
                 async _ => await UpdateManager.PerformMaintenanceShutdownAsync(new List<ServerViewModel> { this }, _globalConfig),
@@ -180,13 +186,16 @@ namespace BDSM
                 new Axis { Name = "RAM (GB)", Position = LiveChartsCore.Measure.AxisPosition.End, MinLimit = 0 }
             };
 
-            // --- THIS IS THE ROBUST STARTUP LOGIC ---
-            // It runs all background work in a single fire-and-forget task
             Task.Run(async () =>
             {
-                // 1. Load initial data, but wrap it in a try-catch so an error doesn't stop everything.
                 try
                 {
+                    // Don't do background work if not installed
+                    if (!IsInstalled)
+                    {
+                        Status = "Not Installed";
+                        return;
+                    }
                     await LoadInitialDataAsync();
                 }
                 catch (Exception ex)
@@ -194,7 +203,6 @@ namespace BDSM
                     Debug.WriteLine($"!!! ERROR during initial data load for {ServerName}: {ex.Message}");
                 }
 
-                // 2. Start the perpetual monitoring task. This will now always run.
                 await MonitorServerAsync();
             });
         }
@@ -258,6 +266,7 @@ namespace BDSM
 
         public async Task CheckForUpdate()
         {
+            if (!IsInstalled) return;
             var result = await UpdateManager.CheckForUpdateAsync(_serverConfig.InstallDir, _globalConfig.AppId, _globalConfig.SteamApiUrl);
             ServerVersion = $"Build: {result.InstalledBuild}";
             IsUpdateAvailable = result.IsUpdateAvailable;
@@ -290,11 +299,22 @@ namespace BDSM
 
             arguments += " " + modArgument;
 
+            string executableName = _serverConfig.UseApiLoader ? "AsaApiLoader.exe" : "ArkAscendedServer.exe";
+            string executablePath = Path.Combine(_serverConfig.InstallDir, "ShooterGame", "Binaries", "Win64", executableName);
+
+            if (!File.Exists(executablePath))
+            {
+                Debug.WriteLine($"Executable not found at {executablePath}. Cannot start server {_serverConfig.Name}.");
+                MessageBox.Show($"Error: The required server executable was not found:\n\n{executablePath}\n\nPlease ensure the server and/or API is installed correctly.", "Executable Not Found", MessageBoxButton.OK, MessageBoxImage.Error);
+                Status = "Stopped";
+                return;
+            }
+
             var processStartInfo = new ProcessStartInfo
             {
-                FileName = _serverConfig.StartExecutable,
+                FileName = executablePath,
                 Arguments = arguments,
-                WorkingDirectory = Path.GetDirectoryName(_serverConfig.StartExecutable),
+                WorkingDirectory = Path.GetDirectoryName(executablePath),
                 UseShellExecute = true,
                 CreateNoWindow = false
             };
@@ -367,9 +387,9 @@ namespace BDSM
 
         private async Task UpdateServerStatus()
         {
-            if (Status == "Shutting Down" || Status == "Updating") return;
+            if (Status == "Shutting Down" || Status == "Updating" || !IsInstalled) return;
 
-            var processName = Path.GetFileNameWithoutExtension(_serverConfig.ServerExecutablePath);
+            var processName = "ArkAscendedServer";
             var allProcesses = Process.GetProcessesByName(processName);
             Process? serverProcess = allProcesses.FirstOrDefault(p => IsCorrectServerProcess(p));
 

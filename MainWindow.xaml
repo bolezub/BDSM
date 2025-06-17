@@ -23,6 +23,12 @@
         <DataTemplate DataType="{x:Type local:SchedulesViewModel}">
             <local:SchedulesView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type local:ClustersViewModel}">
+            <local:ClustersView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type local:GlobalSettingsViewModel}">
+            <local:GlobalSettingsView/>
+        </DataTemplate>
 
         <DataTemplate DataType="{x:Type local:ApplicationViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -95,10 +101,16 @@
                     <TextBlock Text="Schedules"/>
                 </StackPanel>
             </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowSettingsCommand}">
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowClustersCommand}">
                 <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Cog" Margin="0,0,10,0"/>
-                    <TextBlock Text="Settings"/>
+                    <materialDesign:PackIcon Kind="ServerNetwork" Margin="0,0,10,0"/>
+                    <TextBlock Text="Clusters"/>
+                </StackPanel>
+            </Button>
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowGlobalSettingsCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="CogBox" Margin="0,0,10,0"/>
+                    <TextBlock Text="Global Settings"/>
                 </StackPanel>
             </Button>
         </StackPanel>
@@ -106,6 +118,9 @@
         <ContentControl Grid.Row="0" Grid.Column="1" Content="{Binding CurrentView}"/>
 
         <local:StatusBarView Grid.Row="1" Grid.Column="1" DataContext="{Binding StatusBar}"/>
+
+        <materialDesign:Snackbar Grid.Row="0" Grid.Column="1" x:Name="MainSnackbar" MessageQueue="{materialDesign:MessageQueue}" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="0,0,0,10"/>
+
     </Grid>
 
 </Window>

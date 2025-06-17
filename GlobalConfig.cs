@@ -11,6 +11,12 @@ namespace BDSM
         [JsonProperty("schedules")]
         public List<ScheduledTask> Schedules { get; set; } = new List<ScheduledTask>();
 
+        [JsonProperty("gameUserSettingsTemplatePath")]
+        public string GameUserSettingsTemplatePath { get; set; } = string.Empty;
+
+        [JsonProperty("availableMaps")]
+        public List<string> AvailableMaps { get; set; } = new List<string>();
+
         [JsonProperty("backupIntervalMinutes")]
         public int BackupIntervalMinutes { get; set; } = 30;
 
@@ -18,7 +24,7 @@ namespace BDSM
         public int BackupRetryIntervalMinutes { get; set; } = 5;
 
         [JsonProperty("updateCheckIntervalMinutes")]
-        public int UpdateCheckIntervalMinutes { get; set; } = 15; // Default to 15 minutes
+        public int UpdateCheckIntervalMinutes { get; set; } = 15;
 
         [JsonProperty("mcrconPath")]
         public string McRconPath { get; set; } = string.Empty;
@@ -49,5 +55,8 @@ namespace BDSM
 
         [JsonProperty("discordWebhookUrl")]
         public string discordWebhookUrl { get; set; } = string.Empty;
+
+        [JsonProperty("watchdogDiscordWebhookUrl")]
+        public string WatchdogDiscordWebhookUrl { get; set; } = string.Empty;
     }
 }

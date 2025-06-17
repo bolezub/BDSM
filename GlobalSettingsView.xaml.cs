@@ -3,11 +3,11 @@
 namespace BDSM
 {
     /// <summary>
-    /// Interaction logic for SettingsView.xaml
+    /// Interaction logic for GlobalSettingsView.xaml
     /// </summary>
-    public partial class SettingsView : UserControl
+    public partial class GlobalSettingsView : UserControl
     {
-        public SettingsView()
+        public GlobalSettingsView()
         {
             InitializeComponent();
         }

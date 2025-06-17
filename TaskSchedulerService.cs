@@ -38,21 +38,6 @@ namespace BDSM
                 .FirstOrDefault();
         }
 
-        private static bool IsScheduledForToday(ScheduledTask task, DayOfWeek today)
-        {
-            switch (today)
-            {
-                case DayOfWeek.Monday: return task.RunsOnMonday;
-                case DayOfWeek.Tuesday: return task.RunsOnTuesday;
-                case DayOfWeek.Wednesday: return task.RunsOnWednesday;
-                case DayOfWeek.Thursday: return task.RunsOnThursday;
-                case DayOfWeek.Friday: return task.RunsOnFriday;
-                case DayOfWeek.Saturday: return task.RunsOnSaturday;
-                case DayOfWeek.Sunday: return task.RunsOnSunday;
-                default: return false;
-            }
-        }
-
         private static void OnTimerTick(object? state)
         {
             if (IsMajorOperationInProgress || _config == null || _appViewModel == null)
@@ -62,12 +47,10 @@ namespace BDSM
 
             var now = DateTime.Now;
 
-            // Check if the next task's time has passed
             if (NextScheduledTask != null && now >= NextScheduledTask.NextCalculatedRunTime)
             {
-                var taskToRun = NextScheduledTask; // Run the task we identified
+                var taskToRun = NextScheduledTask;
 
-                // Avoid re-running the same instance if the clock ticks multiple times
                 var thisRunInstance = now.Date + taskToRun.ScheduledTime;
                 if (_lastRunTimestamps.ContainsKey(taskToRun.Id) && _lastRunTimestamps[taskToRun.Id] == thisRunInstance)
                 {
@@ -82,7 +65,7 @@ namespace BDSM
                     {
                         _lastRunTimestamps[taskToRun.Id] = thisRunInstance;
                         System.Diagnostics.Debug.WriteLine($"Executing scheduled task: {taskToRun.Name} of type {taskToRun.TaskType}");
-                        var activeServers = _appViewModel.Clusters.SelectMany(c => c.Servers).Where(s => s.IsActive).ToList();
+                        var activeServers = _appViewModel.Clusters.SelectMany(c => c.Servers).Where(s => s.IsActive && s.IsInstalled).ToList();
                         switch (taskToRun.TaskType)
                         {
                             case ScheduledTaskType.DailyReboot:
@@ -91,7 +74,8 @@ namespace BDSM
                             case ScheduledTaskType.MaintenanceShutdown:
                                 await UpdateManager.PerformMaintenanceShutdownAsync(activeServers, _config);
                                 break;
-                            case ScheduledTaskType.FrequentBackup:
+                            // UPDATED to use the new name
+                            case ScheduledTaskType.ScheduledBackup:
                                 await BackupManager.PerformBackupAsync(activeServers, _config);
                                 break;
                         }
@@ -99,7 +83,7 @@ namespace BDSM
                     finally
                     {
                         ReleaseOperationLock();
-                        UpdateNextScheduledTask(); // Find the next task after one has run
+                        UpdateNextScheduledTask();
                     }
                 });
             }
