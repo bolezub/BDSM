@@ -10,9 +10,10 @@
       "servers": [
         {
           "name": "ASA The Island",
+          "sessionName": "boleworld island",
           "isClubArk": false,
-          "installDir": "D:\\Servers\\ASA-TheIsland",
           "useApiLoader": true,
+          "installDir": "D:\\Servers\\ASA-TheIsland",
           "mapFolder": "TheIsland_WP",
           "port": 1460,
           "queryPort": 14060,
@@ -27,9 +28,10 @@
         },
         {
           "name": "ASA Scorched Earth",
+          "sessionName": "boleworld SE",
           "isClubArk": false,
-          "installDir": "D:\\Servers\\ASA-ScorchedEarth",
           "useApiLoader": true,
+          "installDir": "D:\\Servers\\ASA-ScorchedEarth",
           "mapFolder": "ScorchedEarth_WP",
           "port": 1420,
           "queryPort": 14020,
@@ -44,9 +46,10 @@
         },
         {
           "name": "ASA The Center",
+          "sessionName": "boleworld center",
           "isClubArk": false,
-          "installDir": "D:\\Servers\\ASA-TheCenter",
           "useApiLoader": true,
+          "installDir": "D:\\Servers\\ASA-TheCenter",
           "mapFolder": "TheCenter_WP",
           "port": 1450,
           "queryPort": 14050,
@@ -61,9 +64,10 @@
         },
         {
           "name": "ASA Aberration",
+          "sessionName": "boleworld Aberration",
           "isClubArk": false,
-          "installDir": "D:\\Servers\\ASA-Aberration",
           "useApiLoader": true,
+          "installDir": "D:\\Servers\\ASA-Aberration",
           "mapFolder": "Aberration_WP",
           "port": 1470,
           "queryPort": 14070,
@@ -78,9 +82,10 @@
         },
         {
           "name": "ASA Extinction",
+          "sessionName": "boleworld ext",
           "isClubArk": false,
-          "installDir": "D:\\Servers\\ASA-Extinction",
           "useApiLoader": true,
+          "installDir": "D:\\Servers\\ASA-Extinction",
           "mapFolder": "Extinction_WP",
           "port": 1410,
           "queryPort": 14010,
@@ -95,9 +100,10 @@
         },
         {
           "name": "ASA Recovery #1",
+          "sessionName": "boleheaven: Recovery #1",
           "isClubArk": false,
-          "installDir": "D:\\Servers\\ASA-Recovery1",
           "useApiLoader": true,
+          "installDir": "D:\\Servers\\ASA-Recovery1",
           "mapFolder": "Extinction_WP",
           "port": 1430,
           "queryPort": 14030,
@@ -112,16 +118,17 @@
         },
         {
           "name": "ASA Astraeos",
+          "sessionName": "boleworld astraeos",
           "isClubArk": false,
-          "installDir": "d:\\Servers\\ASA-Astraeos",
           "useApiLoader": false,
+          "installDir": "d:\\Servers\\ASA-Astraeos",
           "mapFolder": "Astraeos_WP",
           "port": 1490,
           "queryPort": 14090,
           "rconPort": 14190,
           "mapSpecificMods": [],
           "discordNotificationsEnabled": false,
-          "memoryThresholdGB": 0,
+          "memoryThresholdGB": 35,
           "active": true,
           "hidden": false
         }
@@ -172,6 +179,11 @@
       "RunsOnSunday": true
     }
   ],
+  "watchdog": {
+    "isEnabled": true,
+    "scanIntervalSeconds": 30,
+    "graphPostIntervalMinutes": 3
+  },
   "gameUserSettingsTemplatePath": "D:\\Servers\\Templates\\GameUserSettings.ini",
   "availableMaps": [
     "TheIsland_WP",
@@ -181,6 +193,7 @@
     "Extinction_WP",
     "Astraeos_WP"
   ],
+  "botToken": "MTM4NDg0NzE0MDY1NTk5Mjg4Mg.GoPToN.7f06acleRD4N14DEjL_T9htSsN5fiVFmrFf83A",
   "backupIntervalMinutes": 30,
   "backupRetryIntervalMinutes": 3,
   "updateCheckIntervalMinutes": 30,
@@ -193,5 +206,6 @@
   "startArgumentsTemplate": "{mapFolder}?listen?MultiHome={serverIP}?Port={port}?QueryPort={queryPort}?AllowCrateSpawnsOnTopOfStructures=True -noundermeshchecking -noundermeshkilling -EnableIdlePlayerKick -clusterid={clusterId} -ClusterDirOverride=d:\\asadata -NoTransferFromFiltering -forcerespawndinos -servergamelog -servergamelogincludetribelogs -ServerRCONOutputTribeLogs -nobattleye -WinLiveMaxPlayers=60",
   "appId": "2430930",
   "steamApiUrl": "https://api.steamcmd.net/v1/info/2430930",
-  "discordWebhookUrl": "https://discord.com/api/webhooks/1250776509204008960/gSza2zLAiZj58IHqG5A_UifkkH10VARM5u96rtA7jU5Om2latyDPxAtzjMKJBHcR-ty-"
+  "discordWebhookUrl": "https://discord.com/api/webhooks/1250776509204008960/gSza2zLAiZj58IHqG5A_UifkkH10VARM5u96rtA7jU5Om2latyDPxAtzjMKJBHcR-ty-",
+  "watchdogDiscordWebhookUrl": "https://discord.com/api/webhooks/1369599696770961478/8qcsdNFhnoy-BcvoI3CzrbmgLjiJQP1Lub3MCjJKxo6_e6iYe50uE1D38JDRNhvMrdFm"
 }

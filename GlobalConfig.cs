@@ -11,11 +11,17 @@ namespace BDSM
         [JsonProperty("schedules")]
         public List<ScheduledTask> Schedules { get; set; } = new List<ScheduledTask>();
 
+        [JsonProperty("watchdog")]
+        public WatchdogConfig Watchdog { get; set; } = new WatchdogConfig();
+
         [JsonProperty("gameUserSettingsTemplatePath")]
         public string GameUserSettingsTemplatePath { get; set; } = string.Empty;
 
         [JsonProperty("availableMaps")]
         public List<string> AvailableMaps { get; set; } = new List<string>();
+
+        [JsonProperty("botToken")]
+        public string BotToken { get; set; } = string.Empty;
 
         [JsonProperty("backupIntervalMinutes")]
         public int BackupIntervalMinutes { get; set; } = 30;

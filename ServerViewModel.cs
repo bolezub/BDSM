@@ -51,6 +51,8 @@ namespace BDSM
         public ICommand SendMessageCommand { get; }
         public ICommand SendGenericRconCommand { get; }
         public ICommand ShowGraphDetailCommand { get; }
+        // NEW COMMAND
+        public ICommand KillProcessCommand { get; }
 
         public string ServerName => _serverConfig.Name.Replace("ASA ", "");
         public int RconPort => _serverConfig.RconPort;
@@ -58,7 +60,6 @@ namespace BDSM
         public string MapFolder => _serverConfig.MapFolder;
         public bool DiscordNotificationsEnabled => _serverConfig.DiscordNotificationsEnabled;
         public bool IsActive => _serverConfig.Active;
-        // NEW PROPERTY
         public bool IsInstalled { get; private set; }
 
         public string Status
@@ -66,6 +67,12 @@ namespace BDSM
             get => _status;
             set
             {
+                if (Application.Current == null)
+                {
+                    _status = value;
+                    return;
+                }
+
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     _status = value;
@@ -128,6 +135,7 @@ namespace BDSM
                     case "Update Pending": return Brushes.Orange;
                     case "Shutting Down": return Brushes.DarkOrange;
                     case "Updating": return Brushes.DodgerBlue;
+                    case "Not Installed": return Brushes.SlateGray;
                     default: return Brushes.Gray;
                 }
             }
@@ -140,7 +148,6 @@ namespace BDSM
             _globalConfig = globalConfig;
             MaxRam = serverConfig.MemoryThresholdGB;
 
-            // NEW: Calculate IsInstalled on creation
             string keyFilePath = Path.Combine(_serverConfig.InstallDir, "ShooterGame", "Binaries", "Win64", "ArkAscendedServer.exe");
             IsInstalled = File.Exists(keyFilePath);
 
@@ -174,6 +181,11 @@ namespace BDSM
                 async _ => await ShowMessageDialog(isGeneric: true),
                 _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
 
+            // NEW: Initialize Kill command
+            KillProcessCommand = new RelayCommand(
+                async _ => await KillProcessAsync(),
+                _ => Status != "Stopped" && IsInstalled);
+
 
             Series = new ObservableCollection<ISeries>();
             XAxes = new Axis[]
@@ -190,7 +202,6 @@ namespace BDSM
             {
                 try
                 {
-                    // Don't do background work if not installed
                     if (!IsInstalled)
                     {
                         Status = "Not Installed";
@@ -206,6 +217,57 @@ namespace BDSM
                 await MonitorServerAsync();
             });
         }
+
+        private async Task KillProcessAsync()
+        {
+            var result = MessageBox.Show($"Are you sure you want to forcefully kill the process for server '{ServerName}'?\n\nThis is a last resort and can cause data loss. Use this only if the server is stuck and unresponsive.", "Confirm Kill Process", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result == MessageBoxResult.No)
+            {
+                return;
+            }
+
+            // First, try to kill the cached process object if we have it
+            if (_serverProcess != null && !_serverProcess.HasExited)
+            {
+                try
+                {
+                    _serverProcess.Kill(true); // Kill entire process tree
+                    NotificationService.ShowInfo($"Killed process {_serverProcess.Id} for server {ServerName}.");
+                    Status = "Stopped";
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to kill cached process: {ex.Message}");
+                }
+            }
+
+            // If that fails or we don't have a cached process, find it by path and kill it
+            var processName = "ArkAscendedServer";
+            var allProcesses = Process.GetProcessesByName(processName);
+            var processToKill = allProcesses.FirstOrDefault(p => IsCorrectServerProcess(p));
+
+            if (processToKill != null)
+            {
+                try
+                {
+                    processToKill.Kill(true);
+                    NotificationService.ShowInfo($"Killed process {processToKill.Id} for server {ServerName}.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to kill process for {ServerName}. Reason: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                NotificationService.ShowInfo($"Could not find a running process for {ServerName} to kill. Resetting status.");
+            }
+
+            // Regardless of outcome, reset the status
+            Status = "Stopped";
+        }
+
 
         private async Task LoadInitialDataAsync()
         {
@@ -395,7 +457,7 @@ namespace BDSM
 
             if (serverProcess == null)
             {
-                Status = "Stopped";
+                if (Status != "Stopped") Status = "Stopped";
                 Pid = string.Empty;
                 CurrentPlayers = 0;
                 OnlinePlayers.Clear();

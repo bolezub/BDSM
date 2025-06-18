@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace BDSM
 {
-    public class ClustersViewModel : BaseViewModel // RENAMED CLASS
+    public class ClustersViewModel : BaseViewModel
     {
         private readonly GlobalConfig _config;
         private ClusterConfig? _selectedCluster;
@@ -27,8 +27,9 @@ namespace BDSM
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsClusterSelected));
                 OnPropertyChanged(nameof(SelectedClusterMainModList));
-                OnPropertyChanged(nameof(ServersInSelectedCluster));
-                SelectedServer = null;
+                // When a new cluster is selected, update the server list
+                UpdateServersInSelectedCluster();
+                SelectedServer = null; // And deselect any server
             }
         }
 
@@ -64,19 +65,8 @@ namespace BDSM
 
         public bool ShowInstallButton => IsServerSelected && !IsSelectedServerInstalled;
 
-
-        public ObservableCollection<ServerConfig>? ServersInSelectedCluster
-        {
-            get => SelectedCluster != null ? new ObservableCollection<ServerConfig>(SelectedCluster.Servers) : null;
-            set
-            {
-                if (SelectedCluster != null)
-                {
-                    SelectedCluster.Servers = value?.ToList() ?? new List<ServerConfig>();
-                    OnPropertyChanged();
-                }
-            }
-        }
+        // This is now the main collection for the UI server list
+        public ObservableCollection<ServerConfig> ServersInSelectedCluster { get; set; }
 
         #region Proxy Properties for Mod Lists
 
@@ -138,11 +128,15 @@ namespace BDSM
         public ICommand InstallApiCommand { get; }
         public ICommand LoadFromIniCommand { get; }
         public ICommand SaveToIniCommand { get; }
+        // NEW COMMANDS for reordering
+        public ICommand MoveServerUpCommand { get; }
+        public ICommand MoveServerDownCommand { get; }
 
-        public ClustersViewModel(GlobalConfig globalConfig) // RENAMED CONSTRUCTOR
+        public ClustersViewModel(GlobalConfig globalConfig)
         {
             _config = globalConfig;
             Clusters = new ObservableCollection<ClusterConfig>(_config.Clusters);
+            ServersInSelectedCluster = new ObservableCollection<ServerConfig>();
 
             SaveSettingsCommand = new RelayCommand(_ => SaveSettings());
             AddClusterCommand = new RelayCommand(_ => AddCluster());
@@ -153,7 +147,40 @@ namespace BDSM
             InstallApiCommand = new RelayCommand(async _ => await InstallApi(), _ => IsSelectedServerInstalled && !TaskSchedulerService.IsMajorOperationInProgress);
             LoadFromIniCommand = new RelayCommand(async _ => await LoadFromIniAsync(), _ => IsSelectedServerInstalled);
             SaveToIniCommand = new RelayCommand(async _ => await SaveToIniAsync(), _ => IsSelectedServerInstalled);
+
+            // NEW: Initialize reorder commands
+            MoveServerUpCommand = new RelayCommand(_ => MoveServer(-1), _ => SelectedServer != null && ServersInSelectedCluster.IndexOf(SelectedServer) > 0);
+            MoveServerDownCommand = new RelayCommand(_ => MoveServer(1), _ => SelectedServer != null && ServersInSelectedCluster.IndexOf(SelectedServer) < ServersInSelectedCluster.Count - 1);
         }
+
+        private void UpdateServersInSelectedCluster()
+        {
+            ServersInSelectedCluster.Clear();
+            if (SelectedCluster != null)
+            {
+                foreach (var server in SelectedCluster.Servers)
+                {
+                    ServersInSelectedCluster.Add(server);
+                }
+            }
+        }
+
+        private void MoveServer(int direction)
+        {
+            if (SelectedServer == null) return;
+
+            int oldIndex = ServersInSelectedCluster.IndexOf(SelectedServer);
+            int newIndex = oldIndex + direction;
+
+            if (newIndex < 0 || newIndex >= ServersInSelectedCluster.Count)
+                return;
+
+            var serverToMove = SelectedServer;
+            ServersInSelectedCluster.Move(oldIndex, newIndex);
+            // Re-select the server to keep it highlighted
+            SelectedServer = serverToMove;
+        }
+
 
         private bool AreSelectedServerPortsValid()
         {
@@ -190,6 +217,9 @@ namespace BDSM
             var iniManager = new IniFileManager(iniPath);
             await iniManager.LoadAsync();
 
+            var sessionName = iniManager.GetValue("SessionSettings", "SessionName");
+            if (!string.IsNullOrEmpty(sessionName)) SelectedServer.SessionName = sessionName;
+
             var portStr = iniManager.GetValue("ServerSettings", "Port");
             if (int.TryParse(portStr, out int port)) SelectedServer.Port = port;
 
@@ -214,6 +244,7 @@ namespace BDSM
             var iniManager = new IniFileManager(iniPath);
             await iniManager.LoadAsync();
 
+            iniManager.SetValue("SessionSettings", "SessionName", SelectedServer.SessionName);
             iniManager.SetValue("ServerSettings", "Port", SelectedServer.Port.ToString());
             iniManager.SetValue("ServerSettings", "QueryPort", SelectedServer.QueryPort.ToString());
             iniManager.SetValue("ServerSettings", "RCONPort", SelectedServer.RconPort.ToString());
@@ -290,9 +321,11 @@ namespace BDSM
 
                     var iniManager = new IniFileManager(destIniPath);
                     await iniManager.LoadAsync();
+                    iniManager.SetValue("SessionSettings", "SessionName", SelectedServer.SessionName);
                     iniManager.SetValue("ServerSettings", "Port", SelectedServer.Port.ToString());
                     iniManager.SetValue("ServerSettings", "QueryPort", SelectedServer.QueryPort.ToString());
                     iniManager.SetValue("ServerSettings", "RCONPort", SelectedServer.RconPort.ToString());
+                    iniManager.SetValue("ServerSettings", "ServerAdminPassword", _config.RconPassword);
                     await iniManager.SaveAsync();
 
                     finalMessage += " Configuration template was applied successfully.";
@@ -338,9 +371,10 @@ namespace BDSM
 
         private void AddServer()
         {
+            if (SelectedCluster == null) return;
             var newServer = new ServerConfig { Name = "New Server", Active = true, MapFolder = "TheIsland_WP", UseApiLoader = false };
-            SelectedCluster?.Servers.Add(newServer);
-            OnPropertyChanged(nameof(ServersInSelectedCluster));
+            SelectedCluster.Servers.Add(newServer);
+            UpdateServersInSelectedCluster(); // Refresh the observable collection
             SelectedServer = newServer;
             _structuralChangesMade = true;
         }
@@ -352,13 +386,20 @@ namespace BDSM
             if (result == MessageBoxResult.Yes)
             {
                 SelectedCluster.Servers.Remove(SelectedServer);
-                OnPropertyChanged(nameof(ServersInSelectedCluster));
+                UpdateServersInSelectedCluster(); // Refresh the observable collection
                 _structuralChangesMade = true;
             }
         }
 
         private void SaveSettings()
         {
+            if (SelectedCluster != null)
+            {
+                // Sync the reordered list back to the main config object before saving
+                SelectedCluster.Servers = ServersInSelectedCluster.ToList();
+            }
+
+            // --- Validation logic remains at the top ---
             var allServers = Clusters.SelectMany(c => c.Servers).ToList();
 
             var portConflicts = allServers.GroupBy(s => s.Port)
@@ -391,6 +432,7 @@ namespace BDSM
                 return;
             }
 
+            // --- Save the file to disk ---
             _config.Clusters = Clusters.ToList();
             try
             {

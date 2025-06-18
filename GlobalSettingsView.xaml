@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:BDSM"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="600" d:DesignWidth="800">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="20">
         <StackPanel>
             <TextBlock Text="Global Settings" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,20"/>
@@ -39,7 +39,7 @@
                 </Grid>
             </Border>
 
-            <TextBlock Text="Server Connection" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesignBody}" Margin="0,20,0,5"/>
+            <TextBlock Text="Server Connection &amp; API Keys" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesignBody}" Margin="0,20,0,5"/>
             <Border BorderBrush="#444" BorderThickness="1" CornerRadius="5" Padding="15">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -47,6 +47,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -64,6 +65,9 @@
 
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Discord Webhook URL (Watchdog):" VerticalAlignment="Center" Margin="0,5,10,5"/>
                     <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding WatchdogDiscordWebhookUrl, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Discord Bot Token:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding BotToken, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
                 </Grid>
             </Border>
 
@@ -84,6 +88,33 @@
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Update Check Interval (Minutes):" VerticalAlignment="Center" Margin="0,5,10,5"/>
                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding UpdateCheckIntervalMinutes, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+                </Grid>
+            </Border>
+
+            <TextBlock Text="Available Maps" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesignBody}" Margin="0,20,0,5"/>
+            <Border BorderBrush="#444" BorderThickness="1" CornerRadius="5" Padding="15">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <ListBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,10" MaxHeight="200"
+                             ItemsSource="{Binding EditableAvailableMaps}"
+                             SelectedItem="{Binding SelectedMap}"/>
+
+                    <TextBox Grid.Row="1" Grid.Column="0" 
+                             materialDesign:HintAssist.Hint="Enter new map name"
+                             Text="{Binding NewMapName, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="Add" Margin="10,0,0,0" Command="{Binding AddMapCommand}"/>
+                        <Button Content="Remove" Margin="5,0,0,0" Command="{Binding RemoveMapCommand}" Foreground="Red"/>
+                    </StackPanel>
+
                 </Grid>
             </Border>
 

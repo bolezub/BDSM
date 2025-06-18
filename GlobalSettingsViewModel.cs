@@ -1,6 +1,8 @@
 ﻿using Microsoft.Win32;
 using Newtonsoft.Json;
+using System.Collections.ObjectModel; // Required for ObservableCollection
 using System.IO;
+using System.Linq; // Required for .Any() and .ToList()
 using System.Windows;
 using System.Windows.Input;
 
@@ -9,6 +11,22 @@ namespace BDSM
     public class GlobalSettingsViewModel : BaseViewModel
     {
         private readonly GlobalConfig _config;
+        private string _newMapName = string.Empty;
+        private string? _selectedMap;
+
+        public ObservableCollection<string> EditableAvailableMaps { get; set; }
+
+        public string NewMapName
+        {
+            get => _newMapName;
+            set { _newMapName = value; OnPropertyChanged(); }
+        }
+
+        public string? SelectedMap
+        {
+            get => _selectedMap;
+            set { _selectedMap = value; OnPropertyChanged(); }
+        }
 
         public string SteamCMDPath
         {
@@ -52,6 +70,13 @@ namespace BDSM
             set { _config.WatchdogDiscordWebhookUrl = value; OnPropertyChanged(); }
         }
 
+        public string BotToken
+        {
+            get => _config.BotToken;
+            set { _config.BotToken = value; OnPropertyChanged(); }
+        }
+
+
         public int BackupIntervalMinutes
         {
             get => _config.BackupIntervalMinutes;
@@ -68,20 +93,55 @@ namespace BDSM
         public ICommand BrowseSteamCMDCommand { get; }
         public ICommand BrowseBackupsPathCommand { get; }
         public ICommand BrowseTemplatePathCommand { get; }
+        // NEW COMMANDS
+        public ICommand AddMapCommand { get; }
+        public ICommand RemoveMapCommand { get; }
 
         public GlobalSettingsViewModel(GlobalConfig globalConfig)
         {
             _config = globalConfig;
-            SaveGlobalSettingsCommand = new RelayCommand(_ => SaveSettings());
 
-            // MODIFIED: We now pass the current path to the browse commands
+            // NEW: Initialize the editable collection from the config
+            EditableAvailableMaps = new ObservableCollection<string>(_config.AvailableMaps);
+
+            SaveGlobalSettingsCommand = new RelayCommand(_ => SaveSettings());
             BrowseSteamCMDCommand = new RelayCommand(_ => BrowseForFile(SteamCMDPath, path => SteamCMDPath = path, "Executable files (*.exe)|*.exe"));
             BrowseBackupsPathCommand = new RelayCommand(_ => BrowseForFolder(BackupPath, path => BackupPath = path));
             BrowseTemplatePathCommand = new RelayCommand(_ => BrowseForFile(GameUserSettingsTemplatePath, path => GameUserSettingsTemplatePath = path, "INI files (*.ini)|*.ini"));
+
+            // NEW: Initialize map management commands
+            AddMapCommand = new RelayCommand(_ => AddMap(), _ => !string.IsNullOrWhiteSpace(NewMapName) && !EditableAvailableMaps.Contains(NewMapName));
+            RemoveMapCommand = new RelayCommand(_ => RemoveMap(), _ => SelectedMap != null);
+        }
+
+        // NEW METHOD
+        private void AddMap()
+        {
+            EditableAvailableMaps.Add(NewMapName);
+            NewMapName = string.Empty; // Clear the textbox
+        }
+
+        // NEW METHOD with validation
+        private void RemoveMap()
+        {
+            if (SelectedMap == null) return;
+
+            // Check if the map is currently in use by any server
+            var allServers = _config.Clusters.SelectMany(c => c.Servers);
+            if (allServers.Any(s => s.MapFolder == SelectedMap))
+            {
+                MessageBox.Show($"Cannot remove the map '{SelectedMap}' because it is currently being used by one or more servers in your Clusters configuration.", "Map in Use", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            EditableAvailableMaps.Remove(SelectedMap);
         }
 
         private void SaveSettings()
         {
+            // NEW: Update the config object before saving
+            _config.AvailableMaps = EditableAvailableMaps.ToList();
+
             try
             {
                 string updatedJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
@@ -94,7 +154,6 @@ namespace BDSM
             }
         }
 
-        // MODIFIED: Method now accepts the current path to set the initial directory
         private void BrowseForFile(string currentPath, System.Action<string> setPathAction, string filter)
         {
             var openFileDialog = new OpenFileDialog
@@ -104,7 +163,6 @@ namespace BDSM
                 CheckPathExists = true
             };
 
-            // NEW: Set the initial directory based on the current path
             if (!string.IsNullOrWhiteSpace(currentPath))
             {
                 string? directory = Path.GetDirectoryName(currentPath);
@@ -120,7 +178,6 @@ namespace BDSM
             }
         }
 
-        // MODIFIED: Method now accepts the current path to set the initial directory
         private void BrowseForFolder(string currentPath, System.Action<string> setPathAction)
         {
             var dialog = new OpenFileDialog
@@ -131,7 +188,6 @@ namespace BDSM
                 FileName = "Folder Selection"
             };
 
-            // NEW: Set the initial directory based on the current path
             if (!string.IsNullOrWhiteSpace(currentPath) && Directory.Exists(currentPath))
             {
                 dialog.InitialDirectory = currentPath;

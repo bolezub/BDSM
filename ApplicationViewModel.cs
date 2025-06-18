@@ -1,9 +1,12 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Text; // Required for StringBuilder
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 
@@ -11,15 +14,17 @@ namespace BDSM
 {
     public class ApplicationViewModel : BaseViewModel
     {
-        public ObservableCollection<ClusterViewModel> Clusters { get; set; }
+        public ObservableCollection<ClusterViewModel> Clusters { get; }
         private GlobalConfig? _config;
+        private IServiceProvider? _services;
 
         private object? _currentView;
         private object? _dashboardView;
         private object? _clustersView;
         private object? _schedulesView;
         private object? _backupsView;
-        private object? _globalSettingsView; // NEW View variable
+        private object? _globalSettingsView;
+        private object? _watchdogView;
 
         public ICommand CheckAllServersForUpdateCommand { get; }
         public ICommand StartUpdateCommand { get; }
@@ -27,7 +32,8 @@ namespace BDSM
         public ICommand ShowClustersCommand { get; }
         public ICommand ShowSchedulesCommand { get; }
         public ICommand ShowBackupsCommand { get; }
-        public ICommand ShowGlobalSettingsCommand { get; } // NEW Command
+        public ICommand ShowGlobalSettingsCommand { get; }
+        public ICommand ShowWatchdogCommand { get; }
         public StatusBarViewModel StatusBar { get; }
 
         public object? CurrentView
@@ -64,7 +70,6 @@ namespace BDSM
                 }
                 CurrentView = _backupsView;
             });
-            // NEW Command Initialization
             ShowGlobalSettingsCommand = new RelayCommand(_ => {
                 if (_globalSettingsView == null && _config != null)
                 {
@@ -72,46 +77,63 @@ namespace BDSM
                 }
                 CurrentView = _globalSettingsView;
             });
-
+            ShowWatchdogCommand = new RelayCommand(_ => {
+                if (_watchdogView == null && _config != null)
+                {
+                    _watchdogView = new WatchdogView { DataContext = new WatchdogViewModel(_config) };
+                }
+                CurrentView = _watchdogView;
+            });
 
             CheckAllServersForUpdateCommand = new RelayCommand(async _ => await CheckAllServersForUpdate(), _ => !TaskSchedulerService.IsMajorOperationInProgress);
             StartUpdateCommand = new RelayCommand(async _ => await StartUpdate(), _ => CanStartUpdate());
 
+            _ = InitializeApplication();
+        }
+
+        private async Task InitializeApplication()
+        {
             bool isInDesignMode = System.ComponentModel.DesignerProperties.GetIsInDesignMode(new DependencyObject());
+            if (isInDesignMode) return;
 
-            if (!isInDesignMode)
+            var serviceCollection = new ServiceCollection();
+            // NEW: Register this ViewModel instance as a singleton service
+            serviceCollection.AddSingleton(this);
+            _services = serviceCollection.BuildServiceProvider();
+
+            _config = JsonConvert.DeserializeObject<GlobalConfig>(File.ReadAllText("config.json"));
+
+            if (_config != null)
             {
-                _config = JsonConvert.DeserializeObject<GlobalConfig>(File.ReadAllText("config.json"));
-
-                if (_config != null)
+                if (_config.AvailableMaps == null || !_config.AvailableMaps.Any())
                 {
-                    if (_config.AvailableMaps == null || !_config.AvailableMaps.Any())
+                    _config.AvailableMaps = new List<string>
                     {
-                        _config.AvailableMaps = new List<string>
-                        {
-                            "TheIsland_WP", "ScorchedEarth_WP", "TheCenter_WP", "Aberration_WP", "Extinction_WP", "Astraeos_WP"
-                        };
-                    }
-
-                    if (_config.Clusters != null)
-                    {
-                        foreach (var clusterConfig in _config.Clusters)
-                        {
-                            var clusterVM = new ClusterViewModel(clusterConfig, _config);
-                            foreach (var serverConfig in clusterConfig.Servers)
-                            {
-                                var serverVM = new ServerViewModel(serverConfig, clusterConfig, _config);
-                                clusterVM.Servers.Add(serverVM);
-                            }
-                            Clusters.Add(clusterVM);
-                        }
-                    }
-
-                    DataLogger.InitializeDatabase(_config.BackupPath);
-                    TaskSchedulerService.Start(_config, this);
-                    BackupSchedulerService.Start(_config, this);
-                    UpdateSchedulerService.Start(_config, this);
+                        "TheIsland_WP", "ScorchedEarth_WP", "TheCenter_WP", "Aberration_WP", "Extinction_WP", "Astraeos_WP"
+                    };
                 }
+
+                if (_config.Clusters != null)
+                {
+                    foreach (var clusterConfig in _config.Clusters)
+                    {
+                        var clusterVM = new ClusterViewModel(clusterConfig, _config);
+                        foreach (var serverConfig in clusterConfig.Servers)
+                        {
+                            var serverVM = new ServerViewModel(serverConfig, clusterConfig, _config);
+                            clusterVM.Servers.Add(serverVM);
+                        }
+                        Clusters.Add(clusterVM);
+                    }
+                }
+
+                DataLogger.InitializeDatabase(_config.BackupPath);
+                TaskSchedulerService.Start(_config, this);
+                BackupSchedulerService.Start(_config, this);
+                UpdateSchedulerService.Start(_config, this);
+                WatchdogService.Start(_config, this);
+                await WatchdogService.InitializeAndStart();
+                await DiscordBotService.StartAsync(_config, _services);
             }
 
             _dashboardView = this;

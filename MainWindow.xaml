@@ -29,6 +29,9 @@
         <DataTemplate DataType="{x:Type local:GlobalSettingsViewModel}">
             <local:GlobalSettingsView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type local:WatchdogViewModel}">
+            <local:WatchdogView/>
+        </DataTemplate>
 
         <DataTemplate DataType="{x:Type local:ApplicationViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -83,16 +86,23 @@
 
         <StackPanel Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Background="#2C2646" Width="200">
             <TextBlock Text="bole's dedicated server manager" Foreground="White" FontWeight="Bold" Margin="20" FontSize="16" TextWrapping="Wrap"/>
+
             <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,10,10,5" Command="{Binding ShowDashboardCommand}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="ViewDashboard" Margin="0,0,10,0"/>
                     <TextBlock Text="Dashboard"/>
                 </StackPanel>
             </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowBackupsCommand}">
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowClustersCommand}">
                 <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="DatabaseSyncOutline" Margin="0,0,10,0"/>
-                    <TextBlock Text="Backups"/>
+                    <materialDesign:PackIcon Kind="ServerNetwork" Margin="0,0,10,0"/>
+                    <TextBlock Text="Clusters"/>
+                </StackPanel>
+            </Button>
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowWatchdogCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Eye" Margin="0,0,10,0"/>
+                    <TextBlock Text="Watchdog"/>
                 </StackPanel>
             </Button>
             <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowSchedulesCommand}">
@@ -101,10 +111,10 @@
                     <TextBlock Text="Schedules"/>
                 </StackPanel>
             </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowClustersCommand}">
+            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowBackupsCommand}">
                 <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="ServerNetwork" Margin="0,0,10,0"/>
-                    <TextBlock Text="Clusters"/>
+                    <materialDesign:PackIcon Kind="DatabaseSyncOutline" Margin="0,0,10,0"/>
+                    <TextBlock Text="Backups"/>
                 </StackPanel>
             </Button>
             <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowGlobalSettingsCommand}">
