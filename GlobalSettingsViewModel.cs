@@ -1,10 +1,10 @@
 ﻿using Microsoft.Win32;
 using Newtonsoft.Json;
-using System.Collections.ObjectModel; // Required for ObservableCollection
 using System.IO;
-using System.Linq; // Required for .Any() and .ToList()
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
+using System.Collections.ObjectModel;
 
 namespace BDSM
 {
@@ -52,11 +52,7 @@ namespace BDSM
             set { _config.ServerIP = value; OnPropertyChanged(); }
         }
 
-        public string RconPassword
-        {
-            get => _config.RconPassword;
-            set { _config.RconPassword = value; OnPropertyChanged(); }
-        }
+        // RconPassword REMOVED from here
 
         public string DiscordWebhookUrl
         {
@@ -76,7 +72,6 @@ namespace BDSM
             set { _config.BotToken = value; OnPropertyChanged(); }
         }
 
-
         public int BackupIntervalMinutes
         {
             get => _config.BackupIntervalMinutes;
@@ -93,7 +88,6 @@ namespace BDSM
         public ICommand BrowseSteamCMDCommand { get; }
         public ICommand BrowseBackupsPathCommand { get; }
         public ICommand BrowseTemplatePathCommand { get; }
-        // NEW COMMANDS
         public ICommand AddMapCommand { get; }
         public ICommand RemoveMapCommand { get; }
 
@@ -101,7 +95,6 @@ namespace BDSM
         {
             _config = globalConfig;
 
-            // NEW: Initialize the editable collection from the config
             EditableAvailableMaps = new ObservableCollection<string>(_config.AvailableMaps);
 
             SaveGlobalSettingsCommand = new RelayCommand(_ => SaveSettings());
@@ -109,24 +102,20 @@ namespace BDSM
             BrowseBackupsPathCommand = new RelayCommand(_ => BrowseForFolder(BackupPath, path => BackupPath = path));
             BrowseTemplatePathCommand = new RelayCommand(_ => BrowseForFile(GameUserSettingsTemplatePath, path => GameUserSettingsTemplatePath = path, "INI files (*.ini)|*.ini"));
 
-            // NEW: Initialize map management commands
             AddMapCommand = new RelayCommand(_ => AddMap(), _ => !string.IsNullOrWhiteSpace(NewMapName) && !EditableAvailableMaps.Contains(NewMapName));
             RemoveMapCommand = new RelayCommand(_ => RemoveMap(), _ => SelectedMap != null);
         }
 
-        // NEW METHOD
         private void AddMap()
         {
             EditableAvailableMaps.Add(NewMapName);
-            NewMapName = string.Empty; // Clear the textbox
+            NewMapName = string.Empty;
         }
 
-        // NEW METHOD with validation
         private void RemoveMap()
         {
             if (SelectedMap == null) return;
 
-            // Check if the map is currently in use by any server
             var allServers = _config.Clusters.SelectMany(c => c.Servers);
             if (allServers.Any(s => s.MapFolder == SelectedMap))
             {
@@ -139,7 +128,6 @@ namespace BDSM
 
         private void SaveSettings()
         {
-            // NEW: Update the config object before saving
             _config.AvailableMaps = EditableAvailableMaps.ToList();
 
             try

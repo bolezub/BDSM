@@ -25,7 +25,11 @@ namespace BDSM
         private readonly ClusterConfig _clusterConfig;
         private readonly GlobalConfig _globalConfig;
 
+        private readonly ObservableCollection<DateTimePoint> _cpuDataPoints;
+        private readonly ObservableCollection<DateTimePoint> _ramDataPoints;
+
         private PerformanceCounter? _cpuCounter;
+        private string _cpuCounterInstanceName = string.Empty;
         private DateTime _lastCpuSampleTime;
 
         private string _status = "Unknown";
@@ -36,6 +40,7 @@ namespace BDSM
         private string _serverVersion = "checking...";
         private bool _isUpdateAvailable = false;
         private Process? _serverProcess;
+        private bool _isRconPrimed = false;
 
         public List<string> OnlinePlayers { get; private set; } = new List<string>();
 
@@ -47,20 +52,24 @@ namespace BDSM
         public ICommand StopServerCommand { get; }
         public ICommand RestartServerCommand { get; }
         public ICommand EmergencyStopCommand { get; }
+        public ICommand KillProcessCommand { get; }
         public ICommand SaveWorldCommand { get; }
         public ICommand SendMessageCommand { get; }
         public ICommand SendGenericRconCommand { get; }
         public ICommand ShowGraphDetailCommand { get; }
-        // NEW COMMAND
-        public ICommand KillProcessCommand { get; }
 
         public string ServerName => _serverConfig.Name.Replace("ASA ", "");
+        public string FullServerName => _serverConfig.Name;
         public int RconPort => _serverConfig.RconPort;
+        public string RconPassword => _serverConfig.RconPassword;
         public string InstallDir => _serverConfig.InstallDir;
         public string MapFolder => _serverConfig.MapFolder;
         public bool DiscordNotificationsEnabled => _serverConfig.DiscordNotificationsEnabled;
         public bool IsActive => _serverConfig.Active;
         public bool IsInstalled { get; private set; }
+
+        public Guid ServerId => _serverConfig.Id;
+        public Process? ServerProcess => _serverProcess;
 
         public string Status
         {
@@ -141,188 +150,115 @@ namespace BDSM
             }
         }
 
-        public ServerViewModel(ServerConfig serverConfig, ClusterConfig clusterConfig, GlobalConfig globalConfig)
+        private ServerViewModel(ServerConfig serverConfig, ClusterConfig clusterConfig, GlobalConfig globalConfig)
         {
             _serverConfig = serverConfig;
             _clusterConfig = clusterConfig;
             _globalConfig = globalConfig;
-            MaxRam = serverConfig.MemoryThresholdGB;
+            MaxRam = serverConfig.MemoryThresholdGB > 0 ? serverConfig.MemoryThresholdGB : 35;
 
             string keyFilePath = Path.Combine(_serverConfig.InstallDir, "ShooterGame", "Binaries", "Win64", "ArkAscendedServer.exe");
             IsInstalled = File.Exists(keyFilePath);
 
             ShowGraphDetailCommand = new RelayCommand(_ => ShowGraphDetail());
+            StartServerCommand = new RelayCommand(_ => StartServer(), _ => (Status == "Stopped" || Status == "Not Installed") && !TaskSchedulerService.IsMajorOperationInProgress && IsInstalled);
+            StopServerCommand = new RelayCommand(async _ => await UpdateManager.PerformMaintenanceShutdownAsync(new List<ServerViewModel> { this }, _globalConfig), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+            RestartServerCommand = new RelayCommand(async _ => await UpdateManager.PerformScheduledRebootAsync(new List<ServerViewModel> { this }, _globalConfig), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+            EmergencyStopCommand = new RelayCommand(async _ => await EmergencyStopServer(), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+            KillProcessCommand = new RelayCommand(async _ => await KillProcessAsync(), _ => Status != "Stopped" && IsInstalled);
+            SaveWorldCommand = new RelayCommand(async _ => await SendRconCommandAsync("SaveWorld"), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+            SendMessageCommand = new RelayCommand(async _ => await ShowMessageDialog(isGeneric: false), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
+            SendGenericRconCommand = new RelayCommand(async _ => await ShowMessageDialog(isGeneric: true), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
 
-            StartServerCommand = new RelayCommand(
-                _ => StartServer(),
-                _ => Status == "Stopped" && !TaskSchedulerService.IsMajorOperationInProgress && IsInstalled);
+            _cpuDataPoints = new ObservableCollection<DateTimePoint>();
+            _ramDataPoints = new ObservableCollection<DateTimePoint>();
 
-            StopServerCommand = new RelayCommand(
-                async _ => await UpdateManager.PerformMaintenanceShutdownAsync(new List<ServerViewModel> { this }, _globalConfig),
-                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
-
-            RestartServerCommand = new RelayCommand(
-                async _ => await UpdateManager.PerformScheduledRebootAsync(new List<ServerViewModel> { this }, _globalConfig),
-                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
-
-            EmergencyStopCommand = new RelayCommand(
-                async _ => await EmergencyStopServer(),
-                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
-
-            SaveWorldCommand = new RelayCommand(
-                async _ => await SendRconCommandAsync("SaveWorld"),
-                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
-
-            SendMessageCommand = new RelayCommand(
-                async _ => await ShowMessageDialog(isGeneric: false),
-                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
-
-            SendGenericRconCommand = new RelayCommand(
-                async _ => await ShowMessageDialog(isGeneric: true),
-                _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
-
-            // NEW: Initialize Kill command
-            KillProcessCommand = new RelayCommand(
-                async _ => await KillProcessAsync(),
-                _ => Status != "Stopped" && IsInstalled);
-
-
-            Series = new ObservableCollection<ISeries>();
-            XAxes = new Axis[]
+            Series = new ObservableCollection<ISeries>
             {
-                new Axis { Labeler = value => value >= 0 ? new DateTime((long)value).ToString("HH:mm") : "", UnitWidth = TimeSpan.FromHours(1).Ticks }
-            };
-            YAxes = new Axis[]
-            {
-                new Axis { Name = "CPU (%)", MinLimit = 0, MaxLimit = 100 },
-                new Axis { Name = "RAM (GB)", Position = LiveChartsCore.Measure.AxisPosition.End, MinLimit = 0 }
+                new LineSeries<DateTimePoint> { Name = "CPU Usage (%)", Values = _cpuDataPoints, Fill = null, Stroke = new SolidColorPaint(SKColors.CornflowerBlue) { StrokeThickness = 2 }, GeometryFill = null, GeometryStroke = null, ScalesYAt = 0 },
+                new LineSeries<DateTimePoint> { Name = "Memory Usage (GB)", Values = _ramDataPoints, Fill = null, Stroke = new SolidColorPaint(SKColors.Orange) { StrokeThickness = 2 }, GeometryFill = null, GeometryStroke = null, ScalesYAt = 1 }
             };
 
-            Task.Run(async () =>
-            {
-                try
-                {
-                    if (!IsInstalled)
-                    {
-                        Status = "Not Installed";
-                        return;
-                    }
-                    await LoadInitialDataAsync();
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"!!! ERROR during initial data load for {ServerName}: {ex.Message}");
-                }
+            XAxes = new Axis[] { new Axis { Labeler = value => new DateTime((long)value).ToString("HH:mm"), UnitWidth = TimeSpan.FromHours(4).Ticks, MinLimit = DateTime.Now.AddHours(-24).Ticks, MaxLimit = DateTime.Now.Ticks } };
+            YAxes = new Axis[] { new Axis { Name = "CPU (%)", MinLimit = 0, MaxLimit = 100 }, new Axis { Name = "RAM (GB)", Position = LiveChartsCore.Measure.AxisPosition.End, MinLimit = 0 } };
+        }
 
-                await MonitorServerAsync();
-            });
+        public static async Task<ServerViewModel> CreateAsync(ServerConfig serverConfig, ClusterConfig clusterConfig, GlobalConfig globalConfig)
+        {
+            var viewModel = new ServerViewModel(serverConfig, clusterConfig, globalConfig);
+            if (viewModel.IsInstalled)
+            {
+                await viewModel.LoadInitialPasswordFromIni();
+                await viewModel.LoadInitialDataAsync();
+            }
+            else
+            {
+                viewModel.Status = "Not Installed";
+            }
+            _ = viewModel.MonitorServerAsync();
+            return viewModel;
+        }
+
+        public async Task LoadInitialPasswordFromIni()
+        {
+            if (!IsInstalled) return;
+            string iniPath = Path.Combine(_serverConfig.InstallDir, "ShooterGame", "Saved", "Config", "WindowsServer", "GameUserSettings.ini");
+            if (!File.Exists(iniPath)) return;
+            var iniManager = new IniFileManager(iniPath);
+            await iniManager.LoadAsync();
+            var adminPass = iniManager.GetValue("ServerSettings", "ServerAdminPassword");
+            if (!string.IsNullOrWhiteSpace(adminPass))
+            {
+                _serverConfig.RconPassword = adminPass;
+                Debug.WriteLine($"Password for {ServerName} loaded from .ini file.");
+            }
         }
 
         private async Task KillProcessAsync()
         {
             var result = MessageBox.Show($"Are you sure you want to forcefully kill the process for server '{ServerName}'?\n\nThis is a last resort and can cause data loss. Use this only if the server is stuck and unresponsive.", "Confirm Kill Process", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (result == MessageBoxResult.No)
-            {
-                return;
-            }
+            if (result == MessageBoxResult.No) return;
 
-            // First, try to kill the cached process object if we have it
-            if (_serverProcess != null && !_serverProcess.HasExited)
+            try
             {
-                try
-                {
-                    _serverProcess.Kill(true); // Kill entire process tree
-                    NotificationService.ShowInfo($"Killed process {_serverProcess.Id} for server {ServerName}.");
-                    Status = "Stopped";
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Failed to kill cached process: {ex.Message}");
-                }
+                _serverProcess?.Kill(true);
+                NotificationService.ShowInfo($"Killed process for server {ServerName}.");
             }
-
-            // If that fails or we don't have a cached process, find it by path and kill it
-            var processName = "ArkAscendedServer";
-            var allProcesses = Process.GetProcessesByName(processName);
-            var processToKill = allProcesses.FirstOrDefault(p => IsCorrectServerProcess(p));
-
-            if (processToKill != null)
+            catch (Exception ex)
             {
-                try
-                {
-                    processToKill.Kill(true);
-                    NotificationService.ShowInfo($"Killed process {processToKill.Id} for server {ServerName}.");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Failed to kill process for {ServerName}. Reason: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                Debug.WriteLine($"Failed to kill process for {ServerName}: {ex.Message}");
             }
-            else
-            {
-                NotificationService.ShowInfo($"Could not find a running process for {ServerName} to kill. Resetting status.");
-            }
-
-            // Regardless of outcome, reset the status
             Status = "Stopped";
+            await Task.CompletedTask;
         }
-
 
         private async Task LoadInitialDataAsync()
         {
-            var data = await DataLogger.GetPerformanceDataAsync(_serverConfig.Name, 24);
-            var cpuValues = data.Select(d => new DateTimePoint(d.Timestamp, d.CpuUsage)).ToList();
-            var ramValues = data.Select(d => new DateTimePoint(d.Timestamp, d.RamUsage)).ToList();
-
-            Series.Add(new LineSeries<DateTimePoint>
+            // FIX: Use the server's unique ID to query the database
+            var data = await DataLogger.GetPerformanceDataAsync(this.ServerId, 24);
+            _cpuDataPoints.Clear();
+            _ramDataPoints.Clear();
+            foreach (var point in data)
             {
-                Name = "CPU Usage (%)",
-                Values = cpuValues,
-                Fill = null,
-                Stroke = new SolidColorPaint(SKColors.CornflowerBlue) { StrokeThickness = 2 },
-                GeometryFill = null,
-                GeometryStroke = null,
-                ScalesYAt = 0
-            });
-
-            Series.Add(new LineSeries<DateTimePoint>
-            {
-                Name = "Memory Usage (GB)",
-                Values = ramValues,
-                Fill = null,
-                Stroke = new SolidColorPaint(SKColors.Orange) { StrokeThickness = 2 },
-                GeometryFill = null,
-                GeometryStroke = null,
-                ScalesYAt = 1
-            });
-
+                _cpuDataPoints.Add(new DateTimePoint(point.Timestamp, point.CpuUsage));
+                _ramDataPoints.Add(new DateTimePoint(point.Timestamp, (double)point.RamUsage));
+            }
             await CheckForUpdate();
         }
 
         private async Task ShowMessageDialog(bool isGeneric)
         {
-            var windowTitle = isGeneric ? "Send RCON Command" : "Send In-Game Message";
-            var messageHint = isGeneric ? "Enter RCON command (e.g., ListPlayers)" : "Enter message to send to the server";
-
-            var messageWindow = new MessageWindow(windowTitle, messageHint);
-
-            bool? result = messageWindow.ShowDialog();
-
-            if (result == true && !string.IsNullOrWhiteSpace(messageWindow.MessageText))
+            var messageWindow = new MessageWindow(isGeneric ? "Send RCON Command" : "Send In-Game Message", isGeneric ? "Enter RCON command (e.g., ListPlayers)" : "Enter message to send to the server");
+            if (messageWindow.ShowDialog() == true && !string.IsNullOrWhiteSpace(messageWindow.MessageText))
             {
-                var commandToSend = isGeneric ? messageWindow.MessageText : $"ServerChat {messageWindow.MessageText}";
-                await SendRconCommandAsync(commandToSend);
+                await SendRconCommandAsync(isGeneric ? messageWindow.MessageText : $"ServerChat {messageWindow.MessageText}");
             }
         }
 
         private void ShowGraphDetail()
         {
             var detailViewModel = new GraphDetailViewModel(this.ServerName, this.Series, this.XAxes, this.YAxes);
-            var detailWindow = new GraphDetailWindow
-            {
-                DataContext = detailViewModel
-            };
+            var detailWindow = new GraphDetailWindow { DataContext = detailViewModel };
             detailWindow.Show();
         }
 
@@ -336,53 +272,22 @@ namespace BDSM
 
         public void StartServer()
         {
+            if (Status != "Stopped" && Status != "Not Installed") return;
             Status = "Starting";
-
-            var mods = new List<int>();
-            if (_serverConfig.IsClubArk)
-            {
-                mods.AddRange(_serverConfig.MapSpecificMods);
-            }
-            else
-            {
-                mods.AddRange(_clusterConfig.MainModList);
-                mods.AddRange(_serverConfig.MapSpecificMods);
-            }
-
-            var distinctMods = mods.Distinct();
-            string modArgument = distinctMods.Any() ? $"-mods={string.Join(",", distinctMods)}" : "";
-
-            string arguments = _globalConfig.StartArgumentsTemplate
-                .Replace("{mapFolder}", _serverConfig.MapFolder)
-                .Replace("{serverIP}", _globalConfig.ServerIP)
-                .Replace("{port}", _serverConfig.Port.ToString())
-                .Replace("{queryPort}", _serverConfig.QueryPort.ToString())
-                .Replace("{clusterId}", _clusterConfig.ClusterId);
-
-            arguments += " " + modArgument;
-
+            var mods = _serverConfig.IsClubArk ? _serverConfig.MapSpecificMods : _clusterConfig.MainModList.Union(_serverConfig.MapSpecificMods).ToList();
+            string modArgument = mods.Any() ? $"-mods={string.Join(",", mods)}" : "";
+            string arguments = $"{_globalConfig.StartArgumentsTemplate.Replace("{mapFolder}", _serverConfig.MapFolder).Replace("{serverIP}", _globalConfig.ServerIP).Replace("{port}", _serverConfig.Port.ToString()).Replace("{queryPort}", _serverConfig.QueryPort.ToString()).Replace("{clusterId}", _clusterConfig.ClusterId)} {modArgument}";
             string executableName = _serverConfig.UseApiLoader ? "AsaApiLoader.exe" : "ArkAscendedServer.exe";
             string executablePath = Path.Combine(_serverConfig.InstallDir, "ShooterGame", "Binaries", "Win64", executableName);
-
             if (!File.Exists(executablePath))
             {
-                Debug.WriteLine($"Executable not found at {executablePath}. Cannot start server {_serverConfig.Name}.");
                 MessageBox.Show($"Error: The required server executable was not found:\n\n{executablePath}\n\nPlease ensure the server and/or API is installed correctly.", "Executable Not Found", MessageBoxButton.OK, MessageBoxImage.Error);
                 Status = "Stopped";
                 return;
             }
-
-            var processStartInfo = new ProcessStartInfo
-            {
-                FileName = executablePath,
-                Arguments = arguments,
-                WorkingDirectory = Path.GetDirectoryName(executablePath),
-                UseShellExecute = true,
-                CreateNoWindow = false
-            };
             try
             {
-                Process.Start(processStartInfo);
+                Process.Start(new ProcessStartInfo(executablePath, arguments) { WorkingDirectory = Path.GetDirectoryName(executablePath), UseShellExecute = true, CreateNoWindow = false });
             }
             catch (Exception ex)
             {
@@ -395,14 +300,8 @@ namespace BDSM
         {
             while (true)
             {
-                try
-                {
-                    await UpdateServerStatus();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"!!! UNEXPECTED ERROR in monitoring loop for {_serverConfig.Name}: {ex.Message}");
-                }
+                try { await UpdateServerStatus(); }
+                catch (Exception ex) { Debug.WriteLine($"!!! UNEXPECTED ERROR in monitoring loop for {FullServerName}: {ex.Message}"); }
                 await Task.Delay(TimeSpan.FromSeconds(10));
             }
         }
@@ -417,29 +316,26 @@ namespace BDSM
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"RCON command to stop server {_serverConfig.Name} failed: {ex.Message}. Forcing shutdown.");
-                if (_serverProcess != null && !_serverProcess.HasExited)
-                {
-                    _serverProcess.Kill();
-                }
+                Debug.WriteLine($"RCON command to stop server {FullServerName} failed: {ex.Message}. Forcing shutdown.");
+                _serverProcess?.Kill();
             }
         }
 
-        public async Task SendRconCommandAsync(string command)
+        public async Task<string> SendRconCommandAsync(string command)
         {
-            if (Status != "Running" && Status != "Stopping") return;
-
+            if (Status == "Stopped" || Status == "Not Installed" || string.IsNullOrWhiteSpace(_serverConfig.RconPassword)) return string.Empty;
             RCON? rconClient = null;
             try
             {
                 var serverEndpoint = new IPEndPoint(IPAddress.Parse(_globalConfig.ServerIP), _serverConfig.RconPort);
-                rconClient = new RCON(serverEndpoint, _globalConfig.RconPassword);
+                rconClient = new RCON(serverEndpoint, _serverConfig.RconPassword);
                 await rconClient.ConnectAsync();
-                await rconClient.SendCommandAsync(command);
+                return await rconClient.SendCommandAsync(command);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"RCON command '{command}' to server {ServerName} failed: {ex.Message}.");
+                throw;
             }
             finally
             {
@@ -447,10 +343,16 @@ namespace BDSM
             }
         }
 
+        private bool IsValidPlayerListResponse(string rconResponse)
+        {
+            if (string.IsNullOrWhiteSpace(rconResponse)) return false;
+            if (rconResponse.Contains("No Players Connected")) return true;
+            return rconResponse.Trim().Split('\n').Any(line => line.Contains(","));
+        }
+
         private async Task UpdateServerStatus()
         {
-            if (Status == "Shutting Down" || Status == "Updating" || !IsInstalled) return;
-
+            if (Status == "Shutting Down" || Status == "Stopping" || Status == "Update Pending" || Status == "Updating" || !IsInstalled) return;
             var processName = "ArkAscendedServer";
             var allProcesses = Process.GetProcessesByName(processName);
             Process? serverProcess = allProcesses.FirstOrDefault(p => IsCorrectServerProcess(p));
@@ -458,14 +360,8 @@ namespace BDSM
             if (serverProcess == null)
             {
                 if (Status != "Stopped") Status = "Stopped";
-                Pid = string.Empty;
-                CurrentPlayers = 0;
-                OnlinePlayers.Clear();
-                CpuUsage = 0;
-                RamUsage = 0;
-                _serverProcess = null;
-                _cpuCounter?.Dispose();
-                _cpuCounter = null;
+                Pid = string.Empty; CurrentPlayers = 0; OnlinePlayers.Clear(); CpuUsage = 0; RamUsage = 0;
+                _serverProcess = null; _cpuCounter?.Dispose(); _cpuCounter = null; _isRconPrimed = false;
                 return;
             }
 
@@ -473,76 +369,77 @@ namespace BDSM
             Pid = $"PID {serverProcess.Id}";
             UpdatePerformanceMetrics();
 
-            RCON? rconClient = null;
             try
             {
-                var serverEndpoint = new IPEndPoint(IPAddress.Parse(_globalConfig.ServerIP), _serverConfig.RconPort);
-                rconClient = new RCON(serverEndpoint, _globalConfig.RconPassword);
-                await rconClient.ConnectAsync();
-                string response = await rconClient.SendCommandAsync("listplayers");
-
-                bool wasJustStarted = (Status == "Starting");
-
-                if (Status != "Update Pending" && Status != "Stopping")
+                string response = await SendRconCommandAsync("listplayers");
+                if (!IsValidPlayerListResponse(response))
                 {
-                    Status = "Running";
+                    _isRconPrimed = false; Status = "Starting"; OnlinePlayers.Clear(); CurrentPlayers = 0; return;
                 }
-
+                if (!_isRconPrimed)
+                {
+                    _isRconPrimed = true; Status = "Starting";
+                }
+                else
+                {
+                    bool wasJustStarted = (Status == "Starting");
+                    if (Status != "Update Pending" && Status != "Stopping" && Status != "Shutting Down") Status = "Running";
+                    if (wasJustStarted && this.DiscordNotificationsEnabled) await DiscordNotifier.SendMessageAsync(_globalConfig.discordWebhookUrl, this.ServerName, "Server is online and ready.");
+                }
                 ParsePlayerInfo(response);
 
-                if (wasJustStarted && this.DiscordNotificationsEnabled)
-                {
-                    await DiscordNotifier.SendMessageAsync(_globalConfig.discordWebhookUrl, this.ServerName, "Server is online and ready.");
-                }
-
-                await DataLogger.LogDataPoint(_serverConfig.Name, CpuUsage, RamUsage);
+                // FIX: Use full server name for logging
+                await DataLogger.LogDataPoint(this.ServerId, CpuUsage, RamUsage);
+                var now = DateTime.Now;
+                _cpuDataPoints.Add(new DateTimePoint(now, CpuUsage));
+                _ramDataPoints.Add(new DateTimePoint(now, RamUsage));
+                const int maxDataPoints = 8640;
+                if (_cpuDataPoints.Count > maxDataPoints) _cpuDataPoints.RemoveAt(0);
+                if (_ramDataPoints.Count > maxDataPoints) _ramDataPoints.RemoveAt(0);
             }
-            catch (SocketException)
+            catch (Exception)
             {
-                if (Status != "Starting" && Status != "Stopping" && Status != "Update Pending")
-                {
-                    Status = "Starting";
-                }
-                CurrentPlayers = 0;
-                OnlinePlayers.Clear();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"RCON check for {_serverConfig.Name} FAILED with generic Exception: {ex.Message}");
-                if (Status != "Starting" && Status != "Stopping" && Status != "Update Pending")
-                {
-                    Status = "Starting";
-                }
-                CurrentPlayers = 0;
-                OnlinePlayers.Clear();
-            }
-            finally
-            {
-                rconClient?.Dispose();
+                _isRconPrimed = false;
+                if (Status != "Starting" && Status != "Stopping" && Status != "Update Pending" && Status != "Shutting Down") Status = "Starting";
+                CurrentPlayers = 0; OnlinePlayers.Clear();
             }
         }
 
         private void UpdatePerformanceMetrics()
         {
             if (_serverProcess == null || _serverProcess.HasExited) return;
-
             try
             {
                 _serverProcess.Refresh();
-                RamUsage = (int)(_serverProcess.WorkingSet64 / (1024 * 1024 * 1024));
+                RamUsage = (int)Math.Round(_serverProcess.WorkingSet64 / (1024.0 * 1024.0 * 1024.0));
 
+                // FIX: Find the specific performance counter instance for this process ID
                 if (_cpuCounter == null)
                 {
-                    _cpuCounter = new PerformanceCounter("Process", "% Processor Time", _serverProcess.ProcessName, true);
-                    _cpuCounter.NextValue();
-                    _lastCpuSampleTime = DateTime.UtcNow;
-                    CpuUsage = 0;
-                    return;
+                    var category = new PerformanceCounterCategory("Process");
+                    var instanceNames = category.GetInstanceNames().Where(inst => inst.StartsWith(_serverProcess.ProcessName)).ToList();
+                    foreach (var name in instanceNames)
+                    {
+                        using (var counter = new PerformanceCounter("Process", "ID Process", name, true))
+                        {
+                            if ((int)counter.RawValue == _serverProcess.Id)
+                            {
+                                _cpuCounterInstanceName = name;
+                                break;
+                            }
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(_cpuCounterInstanceName))
+                    {
+                        _cpuCounter = new PerformanceCounter("Process", "% Processor Time", _cpuCounterInstanceName, true);
+                        _cpuCounter.NextValue(); // Prime the counter
+                    }
+                    else { CpuUsage = 0; return; }
                 }
 
                 if (DateTime.UtcNow - _lastCpuSampleTime > TimeSpan.FromSeconds(2))
                 {
-                    float rawUsage = _cpuCounter.NextValue();
+                    float rawUsage = _cpuCounter?.NextValue() ?? 0;
                     CpuUsage = rawUsage / Environment.ProcessorCount;
                     _lastCpuSampleTime = DateTime.UtcNow;
                 }
@@ -550,35 +447,25 @@ namespace BDSM
             catch (Exception ex)
             {
                 Debug.WriteLine($"Could not update performance metrics for {_serverProcess.ProcessName}. {ex.Message}");
-                CpuUsage = 0;
-                RamUsage = 0;
-                _cpuCounter?.Dispose();
-                _cpuCounter = null;
+                CpuUsage = 0; RamUsage = 0;
+                _cpuCounter?.Dispose(); _cpuCounter = null;
             }
         }
 
         private void ParsePlayerInfo(string rconResponse)
         {
             OnlinePlayers.Clear();
-
             if (string.IsNullOrWhiteSpace(rconResponse) || rconResponse.Contains("No Players Connected"))
             {
-                CurrentPlayers = 0;
-                return;
+                CurrentPlayers = 0; return;
             }
-
             var lines = rconResponse.Trim().Split('\n');
             foreach (var line in lines)
             {
                 var parts = line.Split(',');
-                if (parts.Length > 0)
+                if (parts.Length > 0 && parts[0].IndexOf(' ') != -1)
                 {
-                    int spaceIndex = parts[0].IndexOf(' ');
-                    if (spaceIndex != -1)
-                    {
-                        string name = parts[0].Substring(spaceIndex + 1).Trim();
-                        OnlinePlayers.Add(name);
-                    }
+                    OnlinePlayers.Add(parts[0].Substring(parts[0].IndexOf(' ') + 1).Trim());
                 }
             }
             CurrentPlayers = OnlinePlayers.Count;
@@ -591,14 +478,9 @@ namespace BDSM
                 if (process.HasExited) return false;
                 string processPath = process.MainModule?.FileName ?? string.Empty;
                 if (string.IsNullOrEmpty(processPath)) return false;
-
-                string installDir = Path.GetFullPath(_serverConfig.InstallDir);
-                return Path.GetFullPath(processPath).StartsWith(installDir, StringComparison.OrdinalIgnoreCase);
+                return Path.GetFullPath(processPath).StartsWith(Path.GetFullPath(_serverConfig.InstallDir), StringComparison.OrdinalIgnoreCase);
             }
-            catch
-            {
-                return false;
-            }
+            catch { return false; }
         }
     }
 }

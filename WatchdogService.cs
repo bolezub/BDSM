@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json; // For saving config
 
 namespace BDSM
 {
@@ -19,17 +20,14 @@ namespace BDSM
         private static ApplicationViewModel? _appViewModel;
 
         private static readonly HttpClient _httpClient = new();
-        private static string? _textMessageId;
-        private static readonly string _textMessageIdFilePath = Path.Combine(AppContext.BaseDirectory, "watchdog_text_message_id.txt");
-
-        private static string? _graphMessageId;
-        private static readonly string _graphMessageIdFilePath = Path.Combine(AppContext.BaseDirectory, "watchdog_graph_message_id.txt");
 
         public static DateTime NextScanTime { get; private set; }
         public static DateTime NextGraphPostTime { get; private set; }
 
-        public static void Start(GlobalConfig config, ApplicationViewModel appViewModel)
+        // FIX: The Start method is removed and its logic is merged into InitializeAndStart.
+        public static async Task InitializeAndStart(GlobalConfig config, ApplicationViewModel appViewModel)
         {
+            // FIX: Set the configuration and view model references first.
             _config = config;
             _appViewModel = appViewModel;
 
@@ -39,33 +37,29 @@ namespace BDSM
                 return;
             }
 
-            // This is now handled by RestartTimer, which is called after this method
-        }
-
-        public static async Task InitializeAndStart()
-        {
-            if (_config == null) return;
-
-            // NEW: Delete old messages on startup for a clean slate
+            // The rest of the startup logic can now execute safely.
             await DeleteOldMessage(isGraphMessage: false);
             await DeleteOldMessage(isGraphMessage: true);
 
             RestartTimer();
         }
 
-        // NEW METHOD: Restarts the timer with current config values
         public static void RestartTimer()
         {
             if (_config == null || !_config.Watchdog.IsEnabled)
             {
-                _watchdogTimer?.Change(Timeout.Infinite, Timeout.Infinite); // Stop the timer if disabled
+                _watchdogTimer?.Change(Timeout.Infinite, Timeout.Infinite);
                 Debug.WriteLine("Watchdog service stopped or disabled.");
                 return;
             }
 
             var interval = TimeSpan.FromSeconds(Math.Max(5, _config.Watchdog.ScanIntervalSeconds));
             NextScanTime = DateTime.Now.Add(interval);
-            NextGraphPostTime = DateTime.Now.AddMinutes(_config.Watchdog.GraphPostIntervalMinutes);
+
+            if (NextGraphPostTime == default || DateTime.Now > NextGraphPostTime)
+            {
+                NextGraphPostTime = DateTime.Now.AddMinutes(_config.Watchdog.GraphPostIntervalMinutes);
+            }
 
             if (_watchdogTimer == null)
             {
@@ -112,7 +106,7 @@ namespace BDSM
             {
                 string cpuBar = GetTextBar(server.CpuUsage);
                 double ramUsageGB = server.RamUsage;
-                double maxRamGB = server.MaxRam > 0 ? server.MaxRam : 1;
+                double maxRamGB = server.MaxRam > 0 ? server.MaxRam : 35;
                 double ramPercent = (ramUsageGB / maxRamGB) * 100;
                 string memBar = GetTextBar(ramPercent);
                 string players = $"{server.CurrentPlayers}/{server.MaxPlayers}".PadRight(5);
@@ -173,13 +167,7 @@ namespace BDSM
             string? webhookUrl = _config?.WatchdogDiscordWebhookUrl;
             if (string.IsNullOrWhiteSpace(webhookUrl)) return;
 
-            string idFilePath = isGraphMessage ? _graphMessageIdFilePath : _textMessageIdFilePath;
-            string? messageId = isGraphMessage ? _graphMessageId : _textMessageId;
-
-            if (File.Exists(idFilePath))
-            {
-                messageId = await File.ReadAllTextAsync(idFilePath);
-            }
+            string? messageId = isGraphMessage ? _config.Watchdog.GraphMessageId : _config.Watchdog.TextMessageId;
 
             if (string.IsNullOrWhiteSpace(messageId)) return;
 
@@ -192,10 +180,9 @@ namespace BDSM
             catch (Exception ex) { Debug.WriteLine($"Could not delete old message {messageId}: {ex.Message}"); }
             finally
             {
-                // Clear the state regardless of success
-                if (isGraphMessage) _graphMessageId = null;
-                else _textMessageId = null;
-                File.Delete(idFilePath);
+                if (isGraphMessage) _config.Watchdog.GraphMessageId = string.Empty;
+                else _config.Watchdog.TextMessageId = string.Empty;
+                await SaveConfigAsync();
             }
         }
 
@@ -204,8 +191,7 @@ namespace BDSM
             string? webhookUrl = _config?.WatchdogDiscordWebhookUrl;
             if (string.IsNullOrWhiteSpace(webhookUrl)) return;
 
-            string? messageId = isGraphMessage ? _graphMessageId : _textMessageId;
-            string idFilePath = isGraphMessage ? _graphMessageIdFilePath : _textMessageIdFilePath;
+            string? messageId = isGraphMessage ? _config.Watchdog.GraphMessageId : _config.Watchdog.TextMessageId;
 
             if (isGraphMessage && !string.IsNullOrWhiteSpace(messageId))
             {
@@ -223,8 +209,8 @@ namespace BDSM
                     if (response.IsSuccessStatusCode) return;
                     if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
-                        messageId = null;
-                        File.Delete(idFilePath);
+                        if (isGraphMessage) _config.Watchdog.GraphMessageId = string.Empty;
+                        else _config.Watchdog.TextMessageId = string.Empty;
                     }
                     else return;
                 }
@@ -254,13 +240,27 @@ namespace BDSM
                     var messageResponse = await response.Content.ReadFromJsonAsync<DiscordMessageResponse>();
                     if (messageResponse?.Id != null)
                     {
-                        if (isGraphMessage) _graphMessageId = messageResponse.Id;
-                        else _textMessageId = messageResponse.Id;
-                        await File.WriteAllTextAsync(idFilePath, messageResponse.Id);
+                        if (isGraphMessage) _config.Watchdog.GraphMessageId = messageResponse.Id;
+                        else _config.Watchdog.TextMessageId = messageResponse.Id;
+                        await SaveConfigAsync();
                     }
                 }
             }
             catch (Exception ex) { Debug.WriteLine($"Error posting new Discord message: {ex.Message}"); }
+        }
+
+        private static async Task SaveConfigAsync()
+        {
+            if (_config == null) return;
+            try
+            {
+                string json = JsonConvert.SerializeObject(_config, Formatting.Indented);
+                await File.WriteAllTextAsync("config.json", json);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to save config from WatchdogService: {ex.Message}");
+            }
         }
 
         private static string GetTextBar(double percent, int width = 15)

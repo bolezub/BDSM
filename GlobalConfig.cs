@@ -44,9 +44,6 @@ namespace BDSM
         [JsonProperty("serverIP")]
         public string ServerIP { get; set; } = string.Empty;
 
-        [JsonProperty("rconPassword")]
-        public string RconPassword { get; set; } = string.Empty;
-
         [JsonProperty("modArguments")]
         public string ModArguments { get; set; } = string.Empty;
 

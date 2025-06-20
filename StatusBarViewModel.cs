@@ -5,8 +5,6 @@ namespace BDSM
 {
     public class StatusBarViewModel : BaseViewModel
     {
-        private readonly DispatcherTimer _timer;
-
         private string _nextBackupText = "Calculating...";
         public string NextBackupText
         {
@@ -28,9 +26,21 @@ namespace BDSM
             set { _nextScheduledTaskText = value; OnPropertyChanged(); }
         }
 
+        // Timer is declared but not initialized here.
+        private DispatcherTimer? _timer;
 
         public StatusBarViewModel()
         {
+            // The constructor is now empty.
+        }
+
+        // New method to be called when the UI is ready.
+        public void StartTimer()
+        {
+            // If timer already running, do nothing.
+            if (_timer != null && _timer.IsEnabled)
+                return;
+
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _timer.Tick += Timer_Tick;
             _timer.Start();
@@ -38,28 +48,31 @@ namespace BDSM
 
         private void Timer_Tick(object? sender, EventArgs e)
         {
-            // Update Backup Countdown
+            // This is the same logic as before.
             var backupTimeRemaining = BackupSchedulerService.NextBackupTime - DateTime.Now;
-            if (backupTimeRemaining.TotalSeconds > 0)
-                NextBackupText = $"Next Backup: {backupTimeRemaining:hh\\:mm\\:ss}";
+            if (backupTimeRemaining.TotalSeconds > -1 && BackupSchedulerService.NextBackupTime != default)
+            {
+                NextBackupText = backupTimeRemaining.TotalSeconds > 0 ? $"Next Backup: {backupTimeRemaining:hh\\:mm\\:ss}" : "Next Backup: In progress...";
+            }
             else
-                NextBackupText = "Next Backup: In progress or pending...";
+            {
+                NextBackupText = "Calculating...";
+            }
 
-            // Update Update Check Countdown
             var updateTimeRemaining = UpdateSchedulerService.NextUpdateCheckTime - DateTime.Now;
-            if (updateTimeRemaining.TotalSeconds > 0)
-                NextUpdateText = $"Next Update Check: {updateTimeRemaining:hh\\:mm\\:ss}";
+            if (updateTimeRemaining.TotalSeconds > -1 && UpdateSchedulerService.NextUpdateCheckTime != default)
+            {
+                NextUpdateText = updateTimeRemaining.TotalSeconds > 0 ? $"Next Update Check: {updateTimeRemaining:hh\\:mm\\:ss}" : "Next Update Check: In progress...";
+            }
             else
-                NextUpdateText = "Next Update Check: In progress or pending...";
+            {
+                NextUpdateText = "Calculating...";
+            }
 
-            // Update Scheduled Task Countdown
             if (TaskSchedulerService.NextScheduledTask?.NextCalculatedRunTime is { } nextRun)
             {
                 var taskTimeRemaining = nextRun - DateTime.Now;
-                if (taskTimeRemaining.TotalSeconds > 0)
-                    NextScheduledTaskText = $"Next Task ({TaskSchedulerService.NextScheduledTask.Name}): {taskTimeRemaining:hh\\:mm\\:ss}";
-                else
-                    NextScheduledTaskText = $"Next Task ({TaskSchedulerService.NextScheduledTask.Name}): Starting...";
+                NextScheduledTaskText = taskTimeRemaining.TotalSeconds > 0 ? $"Next Task ({TaskSchedulerService.NextScheduledTask.Name}): {taskTimeRemaining:hh\\:mm\\:ss}" : $"Next Task ({TaskSchedulerService.NextScheduledTask.Name}): Starting...";
             }
             else
             {

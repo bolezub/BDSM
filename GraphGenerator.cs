@@ -20,7 +20,7 @@ namespace BDSM
         {
             try
             {
-                var rawData = await DataLogger.GetPerformanceDataAsync(server.ServerName, 24);
+                var rawData = await DataLogger.GetPerformanceDataAsync(server.ServerId, 24);
 
                 // NEW: Create a complete timeline for the last 24 hours, filling in gaps
                 var timeNow = DateTime.Now;

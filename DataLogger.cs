@@ -14,6 +14,12 @@ namespace BDSM
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(basePath) || !Directory.Exists(basePath))
+                {
+                    System.Diagnostics.Debug.WriteLine($"!!! DATABASE INITIALIZATION FAILED: Base path is invalid or does not exist.");
+                    return;
+                }
+
                 _databaseFile = Path.Combine(basePath, "performance_logs.db");
 
                 using (var connection = new SqliteConnection($"Data Source={_databaseFile}"))
@@ -21,12 +27,13 @@ namespace BDSM
                     connection.Open();
 
                     var command = connection.CreateCommand();
+                    // FIX: Change ServerName column to ServerId for unique tracking
                     command.CommandText =
                     @"
                         CREATE TABLE IF NOT EXISTS PerformanceLogs (
                             Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                             Timestamp TEXT NOT NULL,
-                            ServerName TEXT NOT NULL,
+                            ServerId TEXT NOT NULL, 
                             CpuUsage REAL NOT NULL,
                             RamUsage INTEGER NOT NULL
                         );
@@ -41,7 +48,8 @@ namespace BDSM
             }
         }
 
-        public static async Task LogDataPoint(string serverName, float cpuUsage, int ramUsage)
+        // FIX: Log data against the server's unique Guid
+        public static async Task LogDataPoint(Guid serverId, float cpuUsage, int ramUsage)
         {
             if (string.IsNullOrEmpty(_databaseFile)) return;
 
@@ -54,12 +62,12 @@ namespace BDSM
                     var command = connection.CreateCommand();
                     command.CommandText =
                     @"
-                        INSERT INTO PerformanceLogs (Timestamp, ServerName, CpuUsage, RamUsage)
-                        VALUES ($timestamp, $serverName, $cpuUsage, $ramUsage);
+                        INSERT INTO PerformanceLogs (Timestamp, ServerId, CpuUsage, RamUsage)
+                        VALUES ($timestamp, $serverId, $cpuUsage, $ramUsage);
                     ";
 
                     command.Parameters.AddWithValue("$timestamp", DateTime.Now.ToString("o"));
-                    command.Parameters.AddWithValue("$serverName", serverName);
+                    command.Parameters.AddWithValue("$serverId", serverId.ToString());
                     command.Parameters.AddWithValue("$cpuUsage", Math.Round(cpuUsage, 2));
                     command.Parameters.AddWithValue("$ramUsage", ramUsage);
 
@@ -68,12 +76,11 @@ namespace BDSM
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"!!! FAILED to write performance data to database for {serverName}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"!!! FAILED to write performance data to database for {serverId}: {ex.Message}");
             }
         }
 
-        // --- THIS IS THE NEW METHOD ---
-        public static async Task<List<PerformanceDataPoint>> GetPerformanceDataAsync(string serverName, int hours = 24)
+        public static async Task<List<PerformanceDataPoint>> GetPerformanceDataAsync(Guid serverId, int hours = 24)
         {
             var dataPoints = new List<PerformanceDataPoint>();
             if (string.IsNullOrEmpty(_databaseFile)) return dataPoints;
@@ -88,12 +95,12 @@ namespace BDSM
                     @"
                         SELECT Timestamp, CpuUsage, RamUsage
                         FROM PerformanceLogs
-                        WHERE ServerName = $serverName AND Timestamp >= $startTime
+                        WHERE ServerId = $serverId AND Timestamp >= $startTime
                         ORDER BY Timestamp;
                     ";
 
                     var startTime = DateTime.Now.AddHours(-hours).ToString("o");
-                    command.Parameters.AddWithValue("$serverName", serverName);
+                    command.Parameters.AddWithValue("$serverId", serverId.ToString());
                     command.Parameters.AddWithValue("$startTime", startTime);
 
                     using (var reader = await command.ExecuteReaderAsync())
@@ -112,11 +119,10 @@ namespace BDSM
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"!!! FAILED to read performance data for {serverName}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"!!! FAILED to read performance data for {serverId}: {ex.Message}");
             }
 
             return dataPoints;
         }
-        // --- END OF NEW METHOD ---
     }
 }

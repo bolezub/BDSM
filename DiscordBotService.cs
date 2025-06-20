@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Reflection; // Required for command handling
+using System.Reflection;
 using System.Threading.Tasks;
 using Discord;
-using Discord.Commands; // Required for command handling
+using Discord.Commands;
 using Discord.WebSocket;
 
 namespace BDSM
@@ -38,12 +38,8 @@ namespace BDSM
 
             try
             {
-                // Subscribe to the MessageReceived event to handle commands
                 _client.MessageReceived += HandleCommandAsync;
-
-                // Discover all of the commands in this assembly and load them.
                 await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
-
                 await _client.LoginAsync(TokenType.Bot, _config.BotToken);
                 await _client.StartAsync();
             }
@@ -53,36 +49,25 @@ namespace BDSM
             }
         }
 
-        // NEW METHOD: This is the core command handler
         private static async Task HandleCommandAsync(SocketMessage messageParam)
         {
-            // Don't process the command if it was a system message or from a bot
             if (!(messageParam is SocketUserMessage message) || message.Author.IsBot) return;
-
-            // Create a number to track where the prefix ends and the command begins
             int argPos = 0;
-
-            // Determine if the message is a command based on the prefix '!'
             if (!(message.HasCharPrefix('!', ref argPos))) return;
-
-            // Create a WebSocket-based command context based on the message
             var context = new SocketCommandContext(_client, message);
-
-            // Execute the command with the command context we just created
-            await _commands.ExecuteAsync(
-                context: context,
-                argPos: argPos,
-                services: _services);
+            await _commands.ExecuteAsync(context: context, argPos: argPos, services: _services);
         }
 
         private static Task OnReady()
         {
-            Debug.WriteLine($"Discord Bot connected successfully as {_client?.CurrentUser.Username}");
+            // FIX: Added null-conditional operator ?. to CurrentUser to prevent crash on startup.
+            Debug.WriteLine($"Discord Bot connected successfully as {_client?.CurrentUser?.Username ?? "Unknown User"}");
             return Task.CompletedTask;
         }
 
         private static Task Log(LogMessage msg)
         {
+            // Reverted to the original, correct code.
             Debug.WriteLine($"Discord Bot Log: {msg.ToString()}");
             return Task.CompletedTask;
         }

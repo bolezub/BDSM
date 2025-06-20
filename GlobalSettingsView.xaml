@@ -51,23 +51,19 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Server IP Address:" VerticalAlignment="Center" Margin="0,5,10,5"/>
                     <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServerIP, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="RCON Password:" VerticalAlignment="Center" Margin="0,5,10,5"/>
-                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding RconPassword, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Discord Webhook URL (Notifications):" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DiscordWebhookUrl, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Discord Webhook URL (Notifications):" VerticalAlignment="Center" Margin="0,5,10,5"/>
-                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding DiscordWebhookUrl, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Discord Webhook URL (Watchdog):" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding WatchdogDiscordWebhookUrl, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
 
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Discord Webhook URL (Watchdog):" VerticalAlignment="Center" Margin="0,5,10,5"/>
-                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding WatchdogDiscordWebhookUrl, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
-
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Discord Bot Token:" VerticalAlignment="Center" Margin="0,5,10,5"/>
-                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding BotToken, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Discord Bot Token:" VerticalAlignment="Center" Margin="0,5,10,5"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding BotToken, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
                 </Grid>
             </Border>
 

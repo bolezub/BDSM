@@ -22,13 +22,34 @@ namespace BDSM
     {
         private static readonly HttpClient httpClient = new HttpClient();
 
-        #region Public Methods (Initiators)
-
         public static async Task PerformUpdateProcessAsync(List<ServerViewModel> allServersToUpdate, GlobalConfig config)
         {
             var updateTasks = allServersToUpdate.Select(server => HandleSingleServerUpdate(server, config, shouldRestart: server.Status == "Running")).ToList();
             await Task.WhenAll(updateTasks);
             Debug.WriteLine("All manual update tasks have been processed.");
+        }
+
+        public static async Task InstallServerAsync(ServerConfig serverConfig, GlobalConfig globalConfig)
+        {
+            Debug.WriteLine($"Starting installation for {serverConfig.Name} in {serverConfig.InstallDir}");
+
+            string steamCmdArgs = $"+login anonymous +force_install_dir \"{serverConfig.InstallDir}\" +app_update {globalConfig.AppId} validate +quit";
+
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = globalConfig.SteamCMDPath,
+                Arguments = steamCmdArgs,
+                UseShellExecute = true,
+                CreateNoWindow = false
+            };
+
+            Debug.WriteLine($"Starting SteamCMD for {serverConfig.Name}");
+            var process = Process.Start(processStartInfo);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+                Debug.WriteLine($"SteamCMD installation finished for {serverConfig.Name}.");
+            }
         }
 
         public static async Task PerformMaintenanceShutdownAsync(List<ServerViewModel> activeServers, GlobalConfig config)
@@ -80,10 +101,6 @@ namespace BDSM
             }
         }
 
-        #endregion
-
-        #region Core Server Handling Logic
-
         private static async Task HandleSingleServerUpdate(ServerViewModel server, GlobalConfig config, bool shouldRestart)
         {
             if (server.Status == "Running")
@@ -113,28 +130,22 @@ namespace BDSM
             server.Status = "Stopped";
         }
 
-        #endregion
-
-        #region Private Helper Methods (The Steps)
-
-        // --- MODIFIED: This method now also sends the player list to in-game chat ---
         private static async Task GracefulShutdownAsync(ServerViewModel server, GlobalConfig config, string reason)
         {
             server.Status = "Update Pending";
+            string actionWord = reason == "maintenance" ? "shutting down" : "restarting";
 
-            // Send initial 15-minute warning
-            string initialMsg = $"Server {reason} initiated. Restarting in 15 minutes or when empty.";
-            await SendRconCommandAsync(server, config, $"ServerChat {initialMsg}");
+            string initialMsg = $"Server {reason} initiated. Server {actionWord} in 15 minutes or when empty.";
+            await server.SendRconCommandAsync($"ServerChat {initialMsg}");
             await SendDiscordMessageAsync(config, server, initialMsg);
 
-            // Send initial player list to game chat if players are online
             if (server.OnlinePlayers.Any())
             {
                 string playerListMsg = $"Players online: {string.Join(", ", server.OnlinePlayers)}";
-                await SendRconCommandAsync(server, config, $"ServerChat {playerListMsg}");
+                await server.SendRconCommandAsync($"ServerChat {playerListMsg}");
             }
 
-            int totalCountdown = 900; // 15 minutes in seconds
+            int totalCountdown = 900;
             var warningTimes = new Dictionary<int, string>
             {
                 { 600, "10 minutes" },
@@ -152,16 +163,14 @@ namespace BDSM
 
                 if (warningTimes.ContainsKey(totalCountdown))
                 {
-                    // Send the timed warning message
-                    string message = $"Server restarting for {reason} in {warningTimes[totalCountdown]}.";
-                    await SendRconCommandAsync(server, config, $"ServerChat {message}");
+                    string message = $"Server {actionWord} for {reason} in {warningTimes[totalCountdown]}.";
+                    await server.SendRconCommandAsync($"ServerChat {message}");
                     await SendDiscordMessageAsync(config, server, message);
 
-                    // Send the current player list to game chat
                     if (server.OnlinePlayers.Any())
                     {
                         string playerListMsg = $"Players online: {string.Join(", ", server.OnlinePlayers)}";
-                        await SendRconCommandAsync(server, config, $"ServerChat {playerListMsg}");
+                        await server.SendRconCommandAsync($"ServerChat {playerListMsg}");
                     }
                 }
 
@@ -174,10 +183,29 @@ namespace BDSM
                 ? $"Server is empty. Shutting down for {reason} now."
                 : $"Final shutdown for {reason}. Goodbye!";
 
-            await SendRconCommandAsync(server, config, $"ServerChat {finalMsg}");
+            await server.SendRconCommandAsync($"ServerChat {finalMsg}");
             await SendDiscordMessageAsync(config, server, finalMsg);
-            await SendRconCommandAsync(server, config, "DoExit");
-            await Task.Delay(15000);
+            await server.SendRconCommandAsync("DoExit");
+
+            Debug.WriteLine($"Waiting for server {server.ServerName} process to exit...");
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            while (stopwatch.Elapsed.TotalSeconds < 60) // 60-second timeout
+            {
+                if (server.ServerProcess == null || server.ServerProcess.HasExited)
+                {
+                    Debug.WriteLine($"Server {server.ServerName} process has exited gracefully.");
+                    stopwatch.Stop();
+                    server.Status = "Stopped";
+                    return; // Success!
+                }
+                await Task.Delay(1000); // Check every second
+            }
+
+            // If we reach here, the server did not shut down in time.
+            stopwatch.Stop();
+            Debug.WriteLine($"WARNING: Server {server.ServerName} did not shut down within 60 seconds. Forcing kill.");
+            server.KillProcessCommand.Execute(null);
+            server.Status = "Stopped";
         }
 
         private static async Task RunSteamCmdUpdateForServerAsync(ServerViewModel server, GlobalConfig config)
@@ -217,10 +245,6 @@ namespace BDSM
                 Debug.WriteLine($"SteamCMD update finished for {server.ServerName}.");
             }
         }
-
-        #endregion
-
-        #region Update Checking & Communication
 
         public static async Task<UpdateCheckResult> CheckForUpdateAsync(string installDir, string appId, string apiUrl)
         {
@@ -279,7 +303,8 @@ namespace BDSM
             if (server.Status == "Stopped") return;
             try
             {
-                using (var rcon = new RCON(System.Net.IPAddress.Parse(config.ServerIP), (ushort)server.RconPort, config.RconPassword))
+                // MODIFIED: Uses the server's specific RCON password
+                using (var rcon = new RCON(System.Net.IPAddress.Parse(config.ServerIP), (ushort)server.RconPort, server.RconPassword))
                 {
                     await rcon.ConnectAsync();
                     await rcon.SendCommandAsync(command);
@@ -296,30 +321,6 @@ namespace BDSM
             if (server.DiscordNotificationsEnabled)
             {
                 await DiscordNotifier.SendMessageAsync(config.discordWebhookUrl, server.ServerName, message, server.OnlinePlayers);
-            }
-        }
-        #endregion
-
-        public static async Task InstallServerAsync(ServerConfig serverConfig, GlobalConfig globalConfig)
-        {
-            Debug.WriteLine($"Starting installation for {serverConfig.Name} in {serverConfig.InstallDir}");
-
-            string steamCmdArgs = $"+login anonymous +force_install_dir \"{serverConfig.InstallDir}\" +app_update {globalConfig.AppId} validate +quit";
-
-            var processStartInfo = new ProcessStartInfo
-            {
-                FileName = globalConfig.SteamCMDPath,
-                Arguments = steamCmdArgs,
-                UseShellExecute = true,
-                CreateNoWindow = false
-            };
-
-            Debug.WriteLine($"Starting SteamCMD for {serverConfig.Name}");
-            var process = Process.Start(processStartInfo);
-            if (process != null)
-            {
-                await process.WaitForExitAsync();
-                Debug.WriteLine($"SteamCMD installation finished for {serverConfig.Name}.");
             }
         }
     }

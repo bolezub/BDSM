@@ -12,5 +12,11 @@ namespace BDSM
 
         [JsonProperty("graphPostIntervalMinutes")]
         public int GraphPostIntervalMinutes { get; set; } = 15;
+
+        [JsonProperty("textMessageId")]
+        public string TextMessageId { get; set; } = string.Empty;
+
+        [JsonProperty("graphMessageId")]
+        public string GraphMessageId { get; set; } = string.Empty;
     }
 }

@@ -1,19 +1,24 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Win32;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using System.Threading.Tasks;
 
 namespace BDSM
 {
     public class ClustersViewModel : BaseViewModel
     {
         private readonly GlobalConfig _config;
+        private readonly ApplicationViewModel _appViewModel;
         private ClusterConfig? _selectedCluster;
         private ServerConfig? _selectedServer;
+        private ServerViewModel? _liveSelectedServer;
         private bool _structuralChangesMade = false;
 
         public ObservableCollection<ClusterConfig> Clusters { get; set; }
@@ -27,9 +32,8 @@ namespace BDSM
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsClusterSelected));
                 OnPropertyChanged(nameof(SelectedClusterMainModList));
-                // When a new cluster is selected, update the server list
                 UpdateServersInSelectedCluster();
-                SelectedServer = null; // And deselect any server
+                SelectedServer = null;
             }
         }
 
@@ -38,17 +42,63 @@ namespace BDSM
             get => _selectedServer;
             set
             {
+                if (_liveSelectedServer != null)
+                {
+                    _liveSelectedServer.PropertyChanged -= OnLiveServerPropertyChanged;
+                }
+
                 _selectedServer = value;
+
+                if (_selectedServer != null)
+                {
+                    // Find the corresponding live ServerViewModel by its internal name
+                    _liveSelectedServer = _appViewModel.Clusters
+                        .SelectMany(c => c.Servers)
+                        .FirstOrDefault(svm => svm.ServerName == _selectedServer.Name.Replace("ASA ", ""));
+
+                    if (_liveSelectedServer != null)
+                    {
+                        _liveSelectedServer.PropertyChanged += OnLiveServerPropertyChanged;
+                    }
+                }
+                else
+                {
+                    _liveSelectedServer = null;
+                }
+
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsServerSelected));
                 OnPropertyChanged(nameof(SelectedServerMapSpecificMods));
                 OnPropertyChanged(nameof(IsSelectedServerInstalled));
                 OnPropertyChanged(nameof(ShowInstallButton));
+                OnPropertyChanged(nameof(IsSelectedServerEditable));
+            }
+        }
+
+        private void OnLiveServerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ServerViewModel.Status))
+            {
+                OnPropertyChanged(nameof(IsSelectedServerEditable));
             }
         }
 
         public bool IsClusterSelected => SelectedCluster != null;
         public bool IsServerSelected => SelectedServer != null;
+
+        public bool IsSelectedServerEditable
+        {
+            get
+            {
+                if (_liveSelectedServer == null)
+                {
+                    return IsServerSelected;
+                }
+                return _liveSelectedServer.Status == "Stopped" ||
+                       _liveSelectedServer.Status == "Not Installed" ||
+                       _liveSelectedServer.Status == "Unknown";
+            }
+        }
 
         public bool IsSelectedServerInstalled
         {
@@ -65,11 +115,9 @@ namespace BDSM
 
         public bool ShowInstallButton => IsServerSelected && !IsSelectedServerInstalled;
 
-        // This is now the main collection for the UI server list
         public ObservableCollection<ServerConfig> ServersInSelectedCluster { get; set; }
 
         #region Proxy Properties for Mod Lists
-
         public string SelectedClusterMainModList
         {
             get => SelectedCluster != null ? string.Join(",", SelectedCluster.MainModList) : "";
@@ -114,7 +162,6 @@ namespace BDSM
                 }
             }
         }
-
         #endregion
 
         public List<string> AvailableMaps => _config.AvailableMaps;
@@ -128,13 +175,19 @@ namespace BDSM
         public ICommand InstallApiCommand { get; }
         public ICommand LoadFromIniCommand { get; }
         public ICommand SaveToIniCommand { get; }
-        // NEW COMMANDS for reordering
         public ICommand MoveServerUpCommand { get; }
         public ICommand MoveServerDownCommand { get; }
+        public ICommand BrowseInstallDirCommand { get; }
+        public ICommand OpenRootFolderCommand { get; }
+        public ICommand OpenIniFolderCommand { get; }
+        public ICommand OpenInstallFolderCommand { get; }
+        public ICommand OpenMapSaveFolderCommand { get; }
 
-        public ClustersViewModel(GlobalConfig globalConfig)
+
+        public ClustersViewModel(GlobalConfig globalConfig, ApplicationViewModel appViewModel)
         {
             _config = globalConfig;
+            _appViewModel = appViewModel;
             Clusters = new ObservableCollection<ClusterConfig>(_config.Clusters);
             ServersInSelectedCluster = new ObservableCollection<ServerConfig>();
 
@@ -147,10 +200,81 @@ namespace BDSM
             InstallApiCommand = new RelayCommand(async _ => await InstallApi(), _ => IsSelectedServerInstalled && !TaskSchedulerService.IsMajorOperationInProgress);
             LoadFromIniCommand = new RelayCommand(async _ => await LoadFromIniAsync(), _ => IsSelectedServerInstalled);
             SaveToIniCommand = new RelayCommand(async _ => await SaveToIniAsync(), _ => IsSelectedServerInstalled);
-
-            // NEW: Initialize reorder commands
             MoveServerUpCommand = new RelayCommand(_ => MoveServer(-1), _ => SelectedServer != null && ServersInSelectedCluster.IndexOf(SelectedServer) > 0);
             MoveServerDownCommand = new RelayCommand(_ => MoveServer(1), _ => SelectedServer != null && ServersInSelectedCluster.IndexOf(SelectedServer) < ServersInSelectedCluster.Count - 1);
+            BrowseInstallDirCommand = new RelayCommand(_ => BrowseForFolder(SelectedServer?.InstallDir ?? "", path => { if (SelectedServer != null) SelectedServer.InstallDir = path; OnPropertyChanged(nameof(SelectedServer)); }), _ => IsServerSelected);
+
+            OpenRootFolderCommand = new RelayCommand(_ => OpenFolder("Root"), _ => IsServerSelected);
+            OpenIniFolderCommand = new RelayCommand(_ => OpenFolder("Ini"), _ => IsServerSelected && IsSelectedServerInstalled);
+            OpenInstallFolderCommand = new RelayCommand(_ => OpenFolder("Install"), _ => IsServerSelected && IsSelectedServerInstalled);
+            OpenMapSaveFolderCommand = new RelayCommand(_ => OpenFolder("MapSave"), _ => IsServerSelected && IsSelectedServerInstalled);
+        }
+
+        private void OpenFolder(string folderType)
+        {
+            if (SelectedServer == null || string.IsNullOrWhiteSpace(SelectedServer.InstallDir)) return;
+
+            string path = SelectedServer.InstallDir;
+            bool pathExists = false;
+
+            try
+            {
+                switch (folderType)
+                {
+                    case "Root":
+                        // Path is already the InstallDir
+                        break;
+                    case "Ini":
+                        path = Path.Combine(SelectedServer.InstallDir, "ShooterGame", "Saved", "Config", "WindowsServer");
+                        break;
+                    case "Install":
+                        path = Path.Combine(SelectedServer.InstallDir, "ShooterGame", "Binaries", "Win64");
+                        break;
+                    case "MapSave":
+                        path = Path.Combine(SelectedServer.InstallDir, "ShooterGame", "Saved", "SavedArks");
+                        break;
+                }
+
+                pathExists = Directory.Exists(path);
+
+                if (pathExists)
+                {
+                    Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+                }
+                else
+                {
+                    MessageBox.Show($"The directory could not be found. It may not have been created yet.\n\nPath: {path}", "Directory Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred while trying to open the folder:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BrowseForFolder(string currentPath, System.Action<string> setPathAction)
+        {
+            var dialog = new OpenFileDialog
+            {
+                ValidateNames = false,
+                CheckFileExists = false,
+                CheckPathExists = true,
+                FileName = "Folder Selection"
+            };
+
+            if (!string.IsNullOrWhiteSpace(currentPath) && Directory.Exists(currentPath))
+            {
+                dialog.InitialDirectory = currentPath;
+            }
+
+            if (dialog.ShowDialog() == true)
+            {
+                string? folderPath = Path.GetDirectoryName(dialog.FileName);
+                if (!string.IsNullOrWhiteSpace(folderPath))
+                {
+                    setPathAction(folderPath);
+                }
+            }
         }
 
         private void UpdateServersInSelectedCluster()
@@ -177,7 +301,6 @@ namespace BDSM
 
             var serverToMove = SelectedServer;
             ServersInSelectedCluster.Move(oldIndex, newIndex);
-            // Re-select the server to keep it highlighted
             SelectedServer = serverToMove;
         }
 
@@ -185,7 +308,10 @@ namespace BDSM
         private bool AreSelectedServerPortsValid()
         {
             if (SelectedServer == null) return false;
-            return SelectedServer.Port > 0 && SelectedServer.QueryPort > 0 && SelectedServer.RconPort > 0;
+            return SelectedServer.Port > 0 &&
+                   SelectedServer.QueryPort > 0 &&
+                   SelectedServer.RconPort > 0 &&
+                   !string.IsNullOrWhiteSpace(SelectedServer.RconPassword); // Password is now required
         }
 
         private bool AreSelectedServerPortsConflictFree()
@@ -229,6 +355,9 @@ namespace BDSM
             var rconPortStr = iniManager.GetValue("ServerSettings", "RCONPort");
             if (int.TryParse(rconPortStr, out int rconPort)) SelectedServer.RconPort = rconPort;
 
+            var adminPassStr = iniManager.GetValue("ServerSettings", "ServerAdminPassword");
+            if (!string.IsNullOrEmpty(adminPassStr)) SelectedServer.RconPassword = adminPassStr;
+
             var temp = SelectedServer;
             SelectedServer = null;
             SelectedServer = temp;
@@ -248,7 +377,7 @@ namespace BDSM
             iniManager.SetValue("ServerSettings", "Port", SelectedServer.Port.ToString());
             iniManager.SetValue("ServerSettings", "QueryPort", SelectedServer.QueryPort.ToString());
             iniManager.SetValue("ServerSettings", "RCONPort", SelectedServer.RconPort.ToString());
-            iniManager.SetValue("ServerSettings", "ServerAdminPassword", _config.RconPassword);
+            iniManager.SetValue("ServerSettings", "ServerAdminPassword", SelectedServer.RconPassword);
 
             await iniManager.SaveAsync();
             NotificationService.ShowInfo("Settings saved to GameUserSettings.ini.");
@@ -325,7 +454,7 @@ namespace BDSM
                     iniManager.SetValue("ServerSettings", "Port", SelectedServer.Port.ToString());
                     iniManager.SetValue("ServerSettings", "QueryPort", SelectedServer.QueryPort.ToString());
                     iniManager.SetValue("ServerSettings", "RCONPort", SelectedServer.RconPort.ToString());
-                    iniManager.SetValue("ServerSettings", "ServerAdminPassword", _config.RconPassword);
+                    iniManager.SetValue("ServerSettings", "ServerAdminPassword", SelectedServer.RconPassword);
                     await iniManager.SaveAsync();
 
                     finalMessage += " Configuration template was applied successfully.";
@@ -372,9 +501,17 @@ namespace BDSM
         private void AddServer()
         {
             if (SelectedCluster == null) return;
-            var newServer = new ServerConfig { Name = "New Server", Active = true, MapFolder = "TheIsland_WP", UseApiLoader = false };
+            var newServer = new ServerConfig
+            {
+                Id = Guid.NewGuid(),
+                Name = "New Server",
+                Active = true,
+                MapFolder = "TheIsland_WP",
+                UseApiLoader = false,
+                MemoryThresholdGB = 35
+            };
             SelectedCluster.Servers.Add(newServer);
-            UpdateServersInSelectedCluster(); // Refresh the observable collection
+            UpdateServersInSelectedCluster();
             SelectedServer = newServer;
             _structuralChangesMade = true;
         }
@@ -386,7 +523,7 @@ namespace BDSM
             if (result == MessageBoxResult.Yes)
             {
                 SelectedCluster.Servers.Remove(SelectedServer);
-                UpdateServersInSelectedCluster(); // Refresh the observable collection
+                UpdateServersInSelectedCluster();
                 _structuralChangesMade = true;
             }
         }
@@ -399,40 +536,6 @@ namespace BDSM
                 SelectedCluster.Servers = ServersInSelectedCluster.ToList();
             }
 
-            // --- Validation logic remains at the top ---
-            var allServers = Clusters.SelectMany(c => c.Servers).ToList();
-
-            var portConflicts = allServers.GroupBy(s => s.Port)
-                                          .Where(g => g.Count() > 1)
-                                          .Select(g => g.Key.ToString())
-                                          .ToList();
-            if (portConflicts.Any())
-            {
-                MessageBox.Show($"Error: Duplicate Game Port found: {string.Join(", ", portConflicts)}. Each server must have a unique Game Port.", "Port Conflict", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            var queryPortConflicts = allServers.GroupBy(s => s.QueryPort)
-                                               .Where(g => g.Count() > 1)
-                                               .Select(g => g.Key.ToString())
-                                               .ToList();
-            if (queryPortConflicts.Any())
-            {
-                MessageBox.Show($"Error: Duplicate Query Port found: {string.Join(", ", queryPortConflicts)}. Each server must have a unique Query Port.", "Port Conflict", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            var rconPortConflicts = allServers.GroupBy(s => s.RconPort)
-                                              .Where(g => g.Count() > 1)
-                                              .Select(g => g.Key.ToString())
-                                              .ToList();
-            if (rconPortConflicts.Any())
-            {
-                MessageBox.Show($"Error: Duplicate RCON Port found: {string.Join(", ", rconPortConflicts)}. Each server must have a unique RCON Port.", "Port Conflict", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            // --- Save the file to disk ---
             _config.Clusters = Clusters.ToList();
             try
             {
@@ -442,16 +545,19 @@ namespace BDSM
             catch (System.Exception ex)
             {
                 MessageBox.Show($"Failed to save settings: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                return; // Stop if we can't save
             }
 
+            // Since this button no longer affects live servers, we can remove the complex checks
+            // and just show a simple confirmation. The restart message is still relevant for
+            // adding/removing servers.
             if (_structuralChangesMade)
             {
-                MessageBox.Show("Settings saved successfully! You have made structural changes (added/removed a server or cluster). Please restart the application for these changes to be fully reflected on the dashboard.", "Restart Recommended", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Settings saved to config.json! You have made structural changes (added/removed a server or cluster). Please restart the application for these changes to be fully reflected on the dashboard.", "Restart Recommended", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
-                NotificationService.ShowInfo("Settings saved successfully.");
+                NotificationService.ShowInfo("Settings saved to config.json successfully.");
             }
 
             _structuralChangesMade = false;

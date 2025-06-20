@@ -9,6 +9,7 @@ namespace BDSM
     {
         private readonly ClusterConfig _clusterConfig;
         private readonly GlobalConfig _globalConfig;
+        private readonly ApplicationViewModel _appViewModel; // Added for context
 
         public string Name => _clusterConfig.Name;
         public ObservableCollection<ServerViewModel> Servers { get; } = new ObservableCollection<ServerViewModel>();
@@ -20,14 +21,12 @@ namespace BDSM
         public ICommand RestartAllCommand { get; }
         public ICommand MessageAllCommand { get; }
 
-
-        public ClusterViewModel(ClusterConfig clusterConfig, GlobalConfig globalConfig)
+        // MODIFIED: Constructor now accepts ApplicationViewModel
+        public ClusterViewModel(ClusterConfig clusterConfig, GlobalConfig globalConfig, ApplicationViewModel appViewModel)
         {
             _clusterConfig = clusterConfig;
             _globalConfig = globalConfig;
-
-            // This creates a snapshot of active servers at the time of command creation.
-            // A better way is to filter inside the command's action.
+            _appViewModel = appViewModel; // Store the reference
 
             StartAllCommand = new RelayCommand(
                 _ => ServerOperationManager.StartAll(this.Servers.Where(s => s.IsActive)),
@@ -54,16 +53,14 @@ namespace BDSM
                 _ => !TaskSchedulerService.IsMajorOperationInProgress);
         }
 
-        // This is the CORRECTED method using the new MessageWindow
         private async Task ShowMessageDialog()
         {
-            var messageWindow = new MessageWindow();
+            var messageWindow = new MessageWindow("Send Cluster Message", "Enter message to send to all active servers in this cluster");
 
             bool? result = messageWindow.ShowDialog();
 
-            if (result == true)
+            if (result == true && !string.IsNullOrWhiteSpace(messageWindow.MessageText))
             {
-                // Filter for active servers here before sending the message
                 var activeServers = this.Servers.Where(s => s.IsActive);
                 await ServerOperationManager.MessageAllAsync(activeServers, messageWindow.MessageText);
             }

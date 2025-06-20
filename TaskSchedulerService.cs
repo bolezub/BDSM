@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,13 +26,13 @@ namespace BDSM
         {
             _config = config;
             _appViewModel = appViewModel;
-            _timer = new Timer(OnTimerTick, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(1));
+            UpdateNextScheduledTask(); // Initial calculation
+            _timer = new Timer(OnTimerTick, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
         public static void UpdateNextScheduledTask()
         {
             if (_config == null) return;
-
             NextScheduledTask = _config.Schedules
                 .Where(s => s.IsEnabled && s.NextCalculatedRunTime.HasValue)
                 .OrderBy(s => s.NextCalculatedRunTime)
@@ -40,19 +41,18 @@ namespace BDSM
 
         private static void OnTimerTick(object? state)
         {
-            if (IsMajorOperationInProgress || _config == null || _appViewModel == null)
+            UpdateNextScheduledTask();
+
+            if (IsMajorOperationInProgress || _config == null || _appViewModel == null || NextScheduledTask == null)
             {
                 return;
             }
 
-            var now = DateTime.Now;
-
-            if (NextScheduledTask != null && now >= NextScheduledTask.NextCalculatedRunTime)
+            if (DateTime.Now >= NextScheduledTask.NextCalculatedRunTime)
             {
                 var taskToRun = NextScheduledTask;
-
-                var thisRunInstance = now.Date + taskToRun.ScheduledTime;
-                if (_lastRunTimestamps.ContainsKey(taskToRun.Id) && _lastRunTimestamps[taskToRun.Id] == thisRunInstance)
+                var thisRunInstance = DateTime.Now.Date + taskToRun.ScheduledTime;
+                if (_lastRunTimestamps.ContainsKey(taskToRun.Id) && _lastRunTimestamps[taskToRun.Id] >= thisRunInstance)
                 {
                     return;
                 }
@@ -64,7 +64,7 @@ namespace BDSM
                     try
                     {
                         _lastRunTimestamps[taskToRun.Id] = thisRunInstance;
-                        System.Diagnostics.Debug.WriteLine($"Executing scheduled task: {taskToRun.Name} of type {taskToRun.TaskType}");
+                        Debug.WriteLine($"Executing scheduled task: {taskToRun.Name} of type {taskToRun.TaskType}");
                         var activeServers = _appViewModel.Clusters.SelectMany(c => c.Servers).Where(s => s.IsActive && s.IsInstalled).ToList();
                         switch (taskToRun.TaskType)
                         {
@@ -74,7 +74,6 @@ namespace BDSM
                             case ScheduledTaskType.MaintenanceShutdown:
                                 await UpdateManager.PerformMaintenanceShutdownAsync(activeServers, _config);
                                 break;
-                            // UPDATED to use the new name
                             case ScheduledTaskType.ScheduledBackup:
                                 await BackupManager.PerformBackupAsync(activeServers, _config);
                                 break;
@@ -83,7 +82,6 @@ namespace BDSM
                     finally
                     {
                         ReleaseOperationLock();
-                        UpdateNextScheduledTask();
                     }
                 });
             }

@@ -1,13 +1,20 @@
 ﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 
 public class ServerConfig
 {
+    [JsonProperty("id")]
+    public Guid Id { get; set; }
+
     [JsonProperty("name")]
     public string Name { get; set; } = string.Empty;
 
     [JsonProperty("sessionName")]
     public string SessionName { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public string RconPassword { get; set; } = string.Empty;
 
     [JsonProperty("isClubArk")]
     public bool IsClubArk { get; set; } = false;
