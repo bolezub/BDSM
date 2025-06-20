@@ -61,5 +61,8 @@ namespace BDSM
 
         [JsonProperty("watchdogDiscordWebhookUrl")]
         public string WatchdogDiscordWebhookUrl { get; set; } = string.Empty;
+
+        [JsonProperty("shutdownTimeoutSeconds")]
+        public int ShutdownTimeoutSeconds { get; set; } = 120;
     }
 }

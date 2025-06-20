@@ -5,9 +5,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:BDSM"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.Wpf"
              mc:Ignorable="d" 
-             d:DesignHeight="100" d:DesignWidth="1000">
+             d:DesignHeight="100" d:DesignWidth="1000"
+             Visibility="{Binding IsHidden, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
     <Border Background="#2C2646" CornerRadius="10" Margin="0,5">
         <Grid Margin="15">
             <Grid.ColumnDefinitions>
@@ -52,7 +52,7 @@
             <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock Text="Players:" Foreground="LightGray" HorizontalAlignment="Center"/>
                 <TextBlock Foreground="White" FontSize="20" HorizontalAlignment="Center">
-                     <Run Text="{Binding CurrentPlayers}"/>/<Run Text="60"/>
+                    <Run Text="{Binding CurrentPlayers, Mode=OneWay}"/>/<Run Text="60"/>
                 </TextBlock>
             </StackPanel>
 
@@ -61,29 +61,21 @@
                 <TextBlock Text="{Binding CpuUsage, StringFormat='{}{0:F2}%'}" Foreground="White" FontSize="16"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="20,0" HorizontalAlignment="Center">
+            <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="20,0" HorizontalAlignment="center">
                 <TextBlock Text="RAM" Foreground="LightGray"/>
                 <TextBlock Text="{Binding RamUsage, StringFormat='{}{0}GB'}" Foreground="White" FontSize="16"/>
             </StackPanel>
 
-            <Button Grid.Column="4" 
+            <Button Grid.Column="4"
                     Command="{Binding ShowGraphDetailCommand}"
-                    Background="Transparent" 
+                    ToolTip="Show 24-Hour Performance Graph"
+                    Background="Transparent"
                     BorderBrush="Transparent"
-                    HorizontalAlignment="Center" 
+                    HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Margin="20,0">
-                <lvc:CartesianChart
-                    Series="{Binding Series}"
-                    XAxes="{Binding XAxes}"
-                    YAxes="{Binding YAxes}"
                     Width="200"
-                    Height="80"
-                    IsHitTestVisible="False"
-                    TooltipPosition="Hidden"
-                    LegendPosition="Hidden"
-                    ZoomMode="None">
-                </lvc:CartesianChart>
+                    Margin="20,0">
+                <materialDesign:PackIcon Kind="ChartLine" Width="24" Height="24" Foreground="White"/>
             </Button>
 
             <Menu Grid.Column="5" VerticalAlignment="Center" Background="Transparent">
@@ -96,6 +88,7 @@
                     <MenuItem Header="Send Message..." Command="{Binding SendMessageCommand}"/>
                     <MenuItem Header="Send RCON Command..." Command="{Binding SendGenericRconCommand}"/>
                     <Separator/>
+                    <MenuItem Header="E-Stop (DoExit)" Command="{Binding EmergencyStopCommand}" Foreground="OrangeRed" FontWeight="Bold" />
                     <MenuItem Header="Kill Process" Command="{Binding KillProcessCommand}" Foreground="Red" FontWeight="Bold"/>
                 </MenuItem>
             </Menu>

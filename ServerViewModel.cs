@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -10,12 +9,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging; // Added for BitmapImage
 using CoreRCON;
-using LiveChartsCore;
-using LiveChartsCore.Defaults;
-using LiveChartsCore.SkiaSharpView;
-using LiveChartsCore.SkiaSharpView.Painting;
-using SkiaSharp;
 
 namespace BDSM
 {
@@ -24,9 +19,6 @@ namespace BDSM
         private readonly ServerConfig _serverConfig;
         private readonly ClusterConfig _clusterConfig;
         private readonly GlobalConfig _globalConfig;
-
-        private readonly ObservableCollection<DateTimePoint> _cpuDataPoints;
-        private readonly ObservableCollection<DateTimePoint> _ramDataPoints;
 
         private PerformanceCounter? _cpuCounter;
         private string _cpuCounterInstanceName = string.Empty;
@@ -44,9 +36,7 @@ namespace BDSM
 
         public List<string> OnlinePlayers { get; private set; } = new List<string>();
 
-        public ObservableCollection<ISeries> Series { get; set; }
-        public Axis[] XAxes { get; set; }
-        public Axis[] YAxes { get; set; }
+        // LiveCharts properties are now removed.
 
         public ICommand StartServerCommand { get; }
         public ICommand StopServerCommand { get; }
@@ -170,17 +160,7 @@ namespace BDSM
             SendMessageCommand = new RelayCommand(async _ => await ShowMessageDialog(isGeneric: false), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
             SendGenericRconCommand = new RelayCommand(async _ => await ShowMessageDialog(isGeneric: true), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
 
-            _cpuDataPoints = new ObservableCollection<DateTimePoint>();
-            _ramDataPoints = new ObservableCollection<DateTimePoint>();
-
-            Series = new ObservableCollection<ISeries>
-            {
-                new LineSeries<DateTimePoint> { Name = "CPU Usage (%)", Values = _cpuDataPoints, Fill = null, Stroke = new SolidColorPaint(SKColors.CornflowerBlue) { StrokeThickness = 2 }, GeometryFill = null, GeometryStroke = null, ScalesYAt = 0 },
-                new LineSeries<DateTimePoint> { Name = "Memory Usage (GB)", Values = _ramDataPoints, Fill = null, Stroke = new SolidColorPaint(SKColors.Orange) { StrokeThickness = 2 }, GeometryFill = null, GeometryStroke = null, ScalesYAt = 1 }
-            };
-
-            XAxes = new Axis[] { new Axis { Labeler = value => new DateTime((long)value).ToString("HH:mm"), UnitWidth = TimeSpan.FromHours(4).Ticks, MinLimit = DateTime.Now.AddHours(-24).Ticks, MaxLimit = DateTime.Now.Ticks } };
-            YAxes = new Axis[] { new Axis { Name = "CPU (%)", MinLimit = 0, MaxLimit = 100 }, new Axis { Name = "RAM (GB)", Position = LiveChartsCore.Measure.AxisPosition.End, MinLimit = 0 } };
+            // LiveCharts properties initialization is now removed.
         }
 
         public static async Task<ServerViewModel> CreateAsync(ServerConfig serverConfig, ClusterConfig clusterConfig, GlobalConfig globalConfig)
@@ -189,7 +169,6 @@ namespace BDSM
             if (viewModel.IsInstalled)
             {
                 await viewModel.LoadInitialPasswordFromIni();
-                await viewModel.LoadInitialDataAsync();
             }
             else
             {
@@ -232,19 +211,7 @@ namespace BDSM
             await Task.CompletedTask;
         }
 
-        private async Task LoadInitialDataAsync()
-        {
-            // FIX: Use the server's unique ID to query the database
-            var data = await DataLogger.GetPerformanceDataAsync(this.ServerId, 24);
-            _cpuDataPoints.Clear();
-            _ramDataPoints.Clear();
-            foreach (var point in data)
-            {
-                _cpuDataPoints.Add(new DateTimePoint(point.Timestamp, point.CpuUsage));
-                _ramDataPoints.Add(new DateTimePoint(point.Timestamp, (double)point.RamUsage));
-            }
-            await CheckForUpdate();
-        }
+        // The old LoadInitialDataAsync method has been removed.
 
         private async Task ShowMessageDialog(bool isGeneric)
         {
@@ -255,9 +222,26 @@ namespace BDSM
             }
         }
 
-        private void ShowGraphDetail()
+        private async void ShowGraphDetail()
         {
-            var detailViewModel = new GraphDetailViewModel(this.ServerName, this.Series, this.XAxes, this.YAxes);
+            // Use the GraphGenerator we know works.
+            string? imagePath = await GraphGenerator.CreateGraphImageAsync(this);
+
+            if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
+            {
+                MessageBox.Show("Could not generate or find the graph image.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // Load the generated image into a Bitmap so we don't lock the file.
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.UriSource = new Uri(imagePath);
+            bitmap.CacheOption = BitmapCacheOption.OnLoad; // Important!
+            bitmap.EndInit();
+            bitmap.Freeze(); // Good practice for performance
+
+            var detailViewModel = new GraphDetailViewModel(this.ServerName, bitmap);
             var detailWindow = new GraphDetailWindow { DataContext = detailViewModel };
             detailWindow.Show();
         }
@@ -388,14 +372,8 @@ namespace BDSM
                 }
                 ParsePlayerInfo(response);
 
-                // FIX: Use full server name for logging
+                // We are no longer adding to the observable collections here.
                 await DataLogger.LogDataPoint(this.ServerId, CpuUsage, RamUsage);
-                var now = DateTime.Now;
-                _cpuDataPoints.Add(new DateTimePoint(now, CpuUsage));
-                _ramDataPoints.Add(new DateTimePoint(now, RamUsage));
-                const int maxDataPoints = 8640;
-                if (_cpuDataPoints.Count > maxDataPoints) _cpuDataPoints.RemoveAt(0);
-                if (_ramDataPoints.Count > maxDataPoints) _ramDataPoints.RemoveAt(0);
             }
             catch (Exception)
             {
@@ -413,7 +391,6 @@ namespace BDSM
                 _serverProcess.Refresh();
                 RamUsage = (int)Math.Round(_serverProcess.WorkingSet64 / (1024.0 * 1024.0 * 1024.0));
 
-                // FIX: Find the specific performance counter instance for this process ID
                 if (_cpuCounter == null)
                 {
                     var category = new PerformanceCounterCategory("Process");
@@ -432,7 +409,7 @@ namespace BDSM
                     if (!string.IsNullOrEmpty(_cpuCounterInstanceName))
                     {
                         _cpuCounter = new PerformanceCounter("Process", "% Processor Time", _cpuCounterInstanceName, true);
-                        _cpuCounter.NextValue(); // Prime the counter
+                        _cpuCounter.NextValue();
                     }
                     else { CpuUsage = 0; return; }
                 }

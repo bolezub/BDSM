@@ -210,7 +210,7 @@
   "backupIntervalMinutes": 30,
   "backupRetryIntervalMinutes": 3,
   "updateCheckIntervalMinutes": 30,
-  "mcrconPath": "",
+  "shutdownTimeoutSeconds": 180,
   "steamCMDPath": "D:\\SteamCMD\\steamcmd.exe",
   "backupPath": "D:\\Backups\\",
   "serverIP": "127.0.0.1",

@@ -1,22 +1,16 @@
-﻿using LiveChartsCore;
-using LiveChartsCore.SkiaSharpView;
-using System.Collections.ObjectModel;
+﻿using System.Windows.Media.Imaging;
 
 namespace BDSM
 {
     public class GraphDetailViewModel : BaseViewModel
     {
         public string ServerName { get; }
-        public ObservableCollection<ISeries> Series { get; }
-        public Axis[] XAxes { get; }
-        public Axis[] YAxes { get; }
+        public BitmapImage GraphImage { get; }
 
-        public GraphDetailViewModel(string serverName, ObservableCollection<ISeries> series, Axis[] xAxes, Axis[] yAxes)
+        public GraphDetailViewModel(string serverName, BitmapImage graphImage)
         {
             ServerName = serverName;
-            Series = series;
-            XAxes = xAxes;
-            YAxes = yAxes;
+            GraphImage = graphImage;
         }
     }
 }

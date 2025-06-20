@@ -189,7 +189,7 @@ namespace BDSM
 
             Debug.WriteLine($"Waiting for server {server.ServerName} process to exit...");
             Stopwatch stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed.TotalSeconds < 60) // 60-second timeout
+            while (stopwatch.Elapsed.TotalSeconds < config.ShutdownTimeoutSeconds)
             {
                 if (server.ServerProcess == null || server.ServerProcess.HasExited)
                 {
