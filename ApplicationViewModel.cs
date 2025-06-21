@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System.Collections.Generic;
@@ -18,7 +17,7 @@ namespace BDSM
         private GlobalConfig? _config;
         private IServiceProvider? _services;
 
-        public Task InitializationTask { get; private set; }
+        public Task<bool> InitializationTask { get; private set; }
 
         private object? _currentView;
         private object? _dashboardView;
@@ -77,19 +76,47 @@ namespace BDSM
             InitializationTask = InitializeApplication();
         }
 
-        private async Task InitializeApplication()
+        private async Task<bool> InitializeApplication()
         {
+            bool isFirstRun = false;
             bool isInDesignMode = System.ComponentModel.DesignerProperties.GetIsInDesignMode(new DependencyObject());
-            if (isInDesignMode) return;
+            if (isInDesignMode) return false;
+
+            // NEW: Check if the config file exists.
+            if (File.Exists("config.json"))
+            {
+                _config = JsonConvert.DeserializeObject<GlobalConfig>(File.ReadAllText("config.json"));
+            }
+            else
+            {
+                // If it doesn't exist, create a new one with defaults.
+                isFirstRun = true;
+                _config = new GlobalConfig
+                {
+                    Clusters = new List<ClusterConfig>(),
+                    Schedules = new List<ScheduledTask>(),
+                    BackupIntervalMinutes = 30,
+                    UpdateCheckIntervalMinutes = 30,
+                    ShutdownTimeoutSeconds = 120,
+                    ServerIP = "127.0.0.1",
+                    AvailableMaps = new List<string> { "TheIsland_WP", "ScorchedEarth_WP", "TheCenter_WP", "Aberration_WP", "Extinction_WP" },
+                    StartArgumentsTemplate = "{mapFolder}?listen?MultiHome={serverIP}?Port={port}?QueryPort={queryPort}?AllowCrateSpawnsOnTopOfStructures=True -noundermeshchecking -noundermeshkilling -EnableIdlePlayerKick -clusterid={clusterId} -ClusterDirOverride=d:\\asadata -NoTransferFromFiltering -forcerespawndinos -servergamelog -servergamelogincludetribelogs -ServerRCONOutputTribeLogs -nobattleye -WinLiveMaxPlayers=60",
+                    AppId = "2430930",
+                    SteamApiUrl = "https://api.steamcmd.net/v1/info/2430930"
+                };
+
+                // Save the new default config file to disk.
+                string defaultConfigJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
+                File.WriteAllText("config.json", defaultConfigJson);
+            }
 
             var serviceCollection = new ServiceCollection();
             serviceCollection.AddSingleton(this);
             _services = serviceCollection.BuildServiceProvider();
 
-            _config = JsonConvert.DeserializeObject<GlobalConfig>(File.ReadAllText("config.json"));
-
             if (_config != null)
             {
+                // ... (The rest of the initialization logic remains the same, starting from here)
                 bool configWasModified = false;
                 if (_config.Clusters != null)
                 {
@@ -112,22 +139,55 @@ namespace BDSM
                     foreach (var cluster in createdClusters) { Clusters.Add(cluster); }
                 }
 
+                var allServers = Clusters.SelectMany(c => c.Servers).Where(s => s.IsInstalled).ToList();
+
+                var statusCheckTasks = allServers.Select(server => server.UpdateServerStatus()).ToList();
+                await Task.WhenAll(statusCheckTasks);
+
+                var versionCheckTasks = allServers.Select(server => server.CheckForUpdate()).ToList();
+                await Task.WhenAll(versionCheckTasks);
+
+                if (!TaskSchedulerService.IsMajorOperationInProgress)
+                {
+                    var serversNeedingUpdate = allServers.Where(s => s.IsUpdateAvailable).ToList();
+
+                    if (serversNeedingUpdate.Any(s => s.Status == "Starting"))
+                    {
+                        System.Diagnostics.Debug.WriteLine("Postponing startup update: One or more servers is still in the 'Starting' state.");
+                    }
+                    else if (serversNeedingUpdate.Any())
+                    {
+                        _ = UpdateManager.PerformUpdateProcessAsync(serversNeedingUpdate, _config);
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("Skipping startup update check: A major operation was already in progress.");
+                }
+
                 DataLogger.InitializeDatabase(_config.BackupPath);
                 TaskSchedulerService.Start(_config, this);
                 BackupSchedulerService.Start(_config, this);
                 UpdateSchedulerService.Start(_config, this);
                 await WatchdogService.InitializeAndStart(_config, this);
                 await DiscordBotService.StartAsync(_config, _services);
+
+                await UpdateLatestBuildIdAsync();
             }
 
             _dashboardView = this;
             CurrentView = _dashboardView;
+
+            // Return whether this was the first run or not.
+            return isFirstRun;
         }
 
         public async Task CheckAllServersForUpdate()
         {
             var allServers = Clusters.SelectMany(c => c.Servers).Where(s => s.IsInstalled);
             await Task.WhenAll(allServers.Select(svm => svm.CheckForUpdate()).ToList());
+
+            await UpdateLatestBuildIdAsync();
         }
 
         private async Task StartUpdate()
@@ -135,11 +195,24 @@ namespace BDSM
             if (_config == null) return;
             var serversToUpdate = Clusters.SelectMany(c => c.Servers).Where(s => s.IsInstalled && s.IsUpdateAvailable).ToList();
             if (!serversToUpdate.Any()) return;
-            TaskSchedulerService.SetOperationLock();
-            try { await UpdateManager.PerformUpdateProcessAsync(serversToUpdate, _config); }
-            finally { TaskSchedulerService.ReleaseOperationLock(); }
+
+            await UpdateManager.PerformUpdateProcessAsync(serversToUpdate, _config);
         }
 
         private bool CanStartUpdate() => Clusters.SelectMany(c => c.Servers).Any(s => s.IsInstalled && s.IsUpdateAvailable);
+
+        public async Task UpdateLatestBuildIdAsync()
+        {
+            if (_config == null) return;
+            string? latestBuild = await UpdateManager.GetLatestBuildIdAsync(_config.SteamApiUrl, _config.AppId);
+            if (!string.IsNullOrEmpty(latestBuild) && latestBuild != "0")
+            {
+                StatusBar.LatestBuildText = $"Latest Build: {latestBuild}";
+            }
+            else
+            {
+                StatusBar.LatestBuildText = "Latest Build: API Error";
+            }
+        }
     }
 }

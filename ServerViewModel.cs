@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging; // Added for BitmapImage
+using System.Windows.Media.Imaging;
 using CoreRCON;
 
 namespace BDSM
@@ -19,11 +19,9 @@ namespace BDSM
         private readonly ServerConfig _serverConfig;
         private readonly ClusterConfig _clusterConfig;
         private readonly GlobalConfig _globalConfig;
-
         private PerformanceCounter? _cpuCounter;
         private string _cpuCounterInstanceName = string.Empty;
         private DateTime _lastCpuSampleTime;
-
         private string _status = "Unknown";
         private string _pid = string.Empty;
         private int _currentPlayers;
@@ -32,11 +30,9 @@ namespace BDSM
         private string _serverVersion = "checking...";
         private bool _isUpdateAvailable = false;
         private Process? _serverProcess;
-        private bool _isRconPrimed = false;
+        public bool IsHidden => _serverConfig.IsHidden;
 
         public List<string> OnlinePlayers { get; private set; } = new List<string>();
-
-        // LiveCharts properties are now removed.
 
         public ICommand StartServerCommand { get; }
         public ICommand StopServerCommand { get; }
@@ -159,8 +155,6 @@ namespace BDSM
             SaveWorldCommand = new RelayCommand(async _ => await SendRconCommandAsync("SaveWorld"), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
             SendMessageCommand = new RelayCommand(async _ => await ShowMessageDialog(isGeneric: false), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
             SendGenericRconCommand = new RelayCommand(async _ => await ShowMessageDialog(isGeneric: true), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
-
-            // LiveCharts properties initialization is now removed.
         }
 
         public static async Task<ServerViewModel> CreateAsync(ServerConfig serverConfig, ClusterConfig clusterConfig, GlobalConfig globalConfig)
@@ -193,10 +187,13 @@ namespace BDSM
             }
         }
 
-        private async Task KillProcessAsync()
+        public async Task KillProcessAsync(bool force = false)
         {
-            var result = MessageBox.Show($"Are you sure you want to forcefully kill the process for server '{ServerName}'?\n\nThis is a last resort and can cause data loss. Use this only if the server is stuck and unresponsive.", "Confirm Kill Process", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (result == MessageBoxResult.No) return;
+            if (!force)
+            {
+                var result = MessageBox.Show($"Are you sure you want to forcefully kill the process for server '{ServerName}'?\n\nThis is a last resort and can cause data loss. Use this only if the server is stuck and unresponsive.", "Confirm Kill Process", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.No) return;
+            }
 
             try
             {
@@ -211,8 +208,6 @@ namespace BDSM
             await Task.CompletedTask;
         }
 
-        // The old LoadInitialDataAsync method has been removed.
-
         private async Task ShowMessageDialog(bool isGeneric)
         {
             var messageWindow = new MessageWindow(isGeneric ? "Send RCON Command" : "Send In-Game Message", isGeneric ? "Enter RCON command (e.g., ListPlayers)" : "Enter message to send to the server");
@@ -224,22 +219,19 @@ namespace BDSM
 
         private async void ShowGraphDetail()
         {
-            // Use the GraphGenerator we know works.
             string? imagePath = await GraphGenerator.CreateGraphImageAsync(this);
-
             if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
             {
                 MessageBox.Show("Could not generate or find the graph image.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            // Load the generated image into a Bitmap so we don't lock the file.
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.UriSource = new Uri(imagePath);
-            bitmap.CacheOption = BitmapCacheOption.OnLoad; // Important!
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
             bitmap.EndInit();
-            bitmap.Freeze(); // Good practice for performance
+            bitmap.Freeze();
 
             var detailViewModel = new GraphDetailViewModel(this.ServerName, bitmap);
             var detailWindow = new GraphDetailWindow { DataContext = detailViewModel };
@@ -330,11 +322,14 @@ namespace BDSM
         private bool IsValidPlayerListResponse(string rconResponse)
         {
             if (string.IsNullOrWhiteSpace(rconResponse)) return false;
+            // A server that is starting but not fully ready might refuse the connection or return an error.
+            // We consider any response that isn't an explicit player list (or "No Players Connected") as invalid.
             if (rconResponse.Contains("No Players Connected")) return true;
+            // A valid player list contains at least one comma (e.g., "1. PlayerName, PlayerID")
             return rconResponse.Trim().Split('\n').Any(line => line.Contains(","));
         }
 
-        private async Task UpdateServerStatus()
+        public async Task UpdateServerStatus()
         {
             if (Status == "Shutting Down" || Status == "Stopping" || Status == "Update Pending" || Status == "Updating" || !IsInstalled) return;
             var processName = "ArkAscendedServer";
@@ -345,7 +340,7 @@ namespace BDSM
             {
                 if (Status != "Stopped") Status = "Stopped";
                 Pid = string.Empty; CurrentPlayers = 0; OnlinePlayers.Clear(); CpuUsage = 0; RamUsage = 0;
-                _serverProcess = null; _cpuCounter?.Dispose(); _cpuCounter = null; _isRconPrimed = false;
+                _serverProcess = null; _cpuCounter?.Dispose(); _cpuCounter = null;
                 return;
             }
 
@@ -356,30 +351,30 @@ namespace BDSM
             try
             {
                 string response = await SendRconCommandAsync("listplayers");
-                if (!IsValidPlayerListResponse(response))
+
+                if (IsValidPlayerListResponse(response))
                 {
-                    _isRconPrimed = false; Status = "Starting"; OnlinePlayers.Clear(); CurrentPlayers = 0; return;
-                }
-                if (!_isRconPrimed)
-                {
-                    _isRconPrimed = true; Status = "Starting";
+                    bool wasJustStarted = (Status == "Starting");
+                    Status = "Running";
+                    if (wasJustStarted && this.DiscordNotificationsEnabled)
+                    {
+                        await DiscordNotifier.SendMessageAsync(_globalConfig.discordWebhookUrl, this.ServerName, "Server is online and ready.");
+                    }
+                    ParsePlayerInfo(response);
+                    await DataLogger.LogDataPoint(this.ServerId, CpuUsage, RamUsage);
                 }
                 else
                 {
-                    bool wasJustStarted = (Status == "Starting");
-                    if (Status != "Update Pending" && Status != "Stopping" && Status != "Shutting Down") Status = "Running";
-                    if (wasJustStarted && this.DiscordNotificationsEnabled) await DiscordNotifier.SendMessageAsync(_globalConfig.discordWebhookUrl, this.ServerName, "Server is online and ready.");
+                    Status = "Starting";
+                    CurrentPlayers = 0;
+                    OnlinePlayers.Clear();
                 }
-                ParsePlayerInfo(response);
-
-                // We are no longer adding to the observable collections here.
-                await DataLogger.LogDataPoint(this.ServerId, CpuUsage, RamUsage);
             }
             catch (Exception)
             {
-                _isRconPrimed = false;
-                if (Status != "Starting" && Status != "Stopping" && Status != "Update Pending" && Status != "Shutting Down") Status = "Starting";
-                CurrentPlayers = 0; OnlinePlayers.Clear();
+                Status = "Starting";
+                CurrentPlayers = 0;
+                OnlinePlayers.Clear();
             }
         }
 

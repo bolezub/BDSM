@@ -46,5 +46,11 @@ namespace BDSM
             if (_config == null) return;
             NextUpdateCheckTime = DateTime.Now.AddMinutes(Math.Max(1, _config.UpdateCheckIntervalMinutes));
         }
+
+        public static void RecalculateNextRunTime()
+        {
+            CalculateNextUpdateCheckTime();
+            System.Diagnostics.Debug.WriteLine($"Update timer reset due to settings change. New next check at: {NextUpdateCheckTime}");
+        }
     }
 }

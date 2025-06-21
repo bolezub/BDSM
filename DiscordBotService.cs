@@ -28,7 +28,11 @@ namespace BDSM
 
             _client = new DiscordSocketClient(new DiscordSocketConfig
             {
-                GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent | GatewayIntents.GuildMembers
+                // We are removing 'AllUnprivileged' and specifying only what we need.
+                GatewayIntents = GatewayIntents.Guilds |
+                                 GatewayIntents.GuildMessages |
+                                 GatewayIntents.MessageContent |
+                                 GatewayIntents.GuildMembers
             });
 
             _commands = new CommandService();

@@ -193,7 +193,7 @@
     "isEnabled": true,
     "scanIntervalSeconds": 30,
     "graphPostIntervalMinutes": 2,
-    "textMessageId": "1385702736447934625",
+    "textMessageId": "1385319275815764139",
     "graphMessageId": ""
   },
   "gameUserSettingsTemplatePath": "D:\\Servers\\Templates\\GameUserSettings.ini",
@@ -204,13 +204,14 @@
     "Aberration_WP",
     "Extinction_WP",
     "Astraeos_WP",
-    "BobsMissions_WP"
+    "BobsMissions_WP",
+    "Ragnarok_WP"
   ],
   "botToken": "MTM4NDg0NzE0MDY1NTk5Mjg4Mg.GoPToN.7f06acleRD4N14DEjL_T9htSsN5fiVFmrFf83A",
-  "backupIntervalMinutes": 20,
+  "backupIntervalMinutes": 30,
   "backupRetryIntervalMinutes": 3,
   "updateCheckIntervalMinutes": 30,
-  "mcrconPath": "",
+  "shutdownTimeoutSeconds": 180,
   "steamCMDPath": "D:\\SteamCMD\\steamcmd.exe",
   "backupPath": "D:\\Backups\\",
   "serverIP": "127.0.0.1",
@@ -219,6 +220,5 @@
   "appId": "2430930",
   "steamApiUrl": "https://api.steamcmd.net/v1/info/2430930",
   "discordWebhookUrl": "https://discord.com/api/webhooks/1250776509204008960/gSza2zLAiZj58IHqG5A_UifkkH10VARM5u96rtA7jU5Om2latyDPxAtzjMKJBHcR-ty-",
-  "watchdogDiscordWebhookUrl": "https://discord.com/api/webhooks/1369599696770961478/8qcsdNFhnoy-BcvoI3CzrbmgLjiJQP1Lub3MCjJKxo6_e6iYe50uE1D38JDRNhvMrdFm",
-  "shutdownTimeoutSeconds": 180
+  "watchdogDiscordWebhookUrl": "https://discord.com/api/webhooks/1369599696770961478/8qcsdNFhnoy-BcvoI3CzrbmgLjiJQP1Lub3MCjJKxo6_e6iYe50uE1D38JDRNhvMrdFm"
 }

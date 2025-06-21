@@ -125,26 +125,24 @@
                             <Button Grid.Row="2" Grid.Column="2" Content="..." Margin="5,0,0,0" Command="{Binding BrowseInstallDirCommand}"/>
 
                             <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,5">
-                                <Button Command="{Binding InstallServerCommand}"
-                                        Visibility="{Binding ShowInstallButton, Converter={StaticResource BoolToVis}}"
-                                        HorizontalAlignment="Left"
-                                        ToolTipService.ShowOnDisabled="True"
-                                        ToolTip="All Port fields must be non-zero and not conflict with other servers.">
+                                <Button Command="{Binding InstallServerCommand}" Visibility="{Binding ShowInstallButton, Converter={StaticResource BoolToVis}}" HorizontalAlignment="Left" ToolTipService.ShowOnDisabled="True" ToolTip="All Port fields must be non-zero and not conflict with other servers.">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Download" Margin="0,0,8,0"/>
                                         <TextBlock Text="Install Server Files"/>
                                     </StackPanel>
                                 </Button>
-
-                                <Button Command="{Binding InstallApiCommand}"
-                                        IsEnabled="{Binding IsSelectedServerInstalled}"
-                                        HorizontalAlignment="Left" Margin="10,0,0,0">
+                                <Button Command="{Binding InstallApiCommand}" IsEnabled="{Binding IsSelectedServerInstalled}" HorizontalAlignment="Left" Margin="10,0,0,0">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Puzzle" Margin="0,0,8,0"/>
                                         <TextBlock Text="Install/Update API"/>
                                     </StackPanel>
                                 </Button>
-
+                                <Button Command="{Binding VerifyServerFilesCommand}" IsEnabled="{Binding IsSelectedServerInstalled}" HorizontalAlignment="Left" Margin="10,0,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="ShieldCheckOutline" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Verify/Repair Files"/>
+                                    </StackPanel>
+                                </Button>
                                 <Button Command="{Binding LoadFromIniCommand}" ToolTip="Load Settings from GameUserSettings.ini" IsEnabled="{Binding IsSelectedServerInstalled}" Margin="20,0,0,0">
                                     <materialDesign:PackIcon Kind="FileDownloadOutline" />
                                 </Button>

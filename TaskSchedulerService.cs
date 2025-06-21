@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 
 namespace BDSM
 {
@@ -17,8 +18,16 @@ namespace BDSM
 
         public static bool IsMajorOperationInProgress { get; private set; } = false;
 
-        public static void SetOperationLock() => IsMajorOperationInProgress = true;
-        public static void ReleaseOperationLock() => IsMajorOperationInProgress = false;
+        public static void SetOperationLock()
+        {
+            IsMajorOperationInProgress = true;
+            CommandManager.InvalidateRequerySuggested();
+        }
+        public static void ReleaseOperationLock()
+        {
+            IsMajorOperationInProgress = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
 
         public static void ClearLastRunHistory() => _lastRunTimestamps.Clear();
 

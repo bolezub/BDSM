@@ -66,7 +66,7 @@ namespace BDSM
                 return;
             }
 
-            if (server.Status != "Running")
+            if (server.Status != "Running" && server.Status != "Update Pending")
             {
                 await ReplyAsync($"Server **{server.ServerName}** is not currently running.");
                 return;

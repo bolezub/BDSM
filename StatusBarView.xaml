@@ -27,6 +27,14 @@
                 <materialDesign:PackIcon Kind="ClockOutline" Foreground="LightGray" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding NextScheduledTaskText}" Foreground="LightGray" Margin="5,0,0,0" VerticalAlignment="Center"/>
             </StackPanel>
+
+            <Separator Margin="15,5"/>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <materialDesign:PackIcon Kind="Steam" Foreground="LightGray" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding LatestBuildText}" Foreground="LightGray" Margin="5,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+
         </StackPanel>
     </Border>
 </UserControl>

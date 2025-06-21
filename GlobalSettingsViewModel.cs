@@ -134,6 +134,8 @@ namespace BDSM
             {
                 string updatedJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
                 File.WriteAllText("config.json", updatedJson);
+                BackupSchedulerService.RecalculateNextRunTime();
+                UpdateSchedulerService.RecalculateNextRunTime();
                 NotificationService.ShowInfo("Global settings saved successfully.");
             }
             catch (System.Exception ex)

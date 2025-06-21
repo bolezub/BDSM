@@ -43,5 +43,11 @@ namespace BDSM
             if (_config == null) return;
             NextBackupTime = DateTime.Now.AddMinutes(Math.Max(1, _config.BackupIntervalMinutes));
         }
+
+        public static void RecalculateNextRunTime()
+        {
+            CalculateNextBackupTime();
+            System.Diagnostics.Debug.WriteLine($"Backup timer reset due to settings change. New next backup at: {NextBackupTime}");
+        }
     }
 }

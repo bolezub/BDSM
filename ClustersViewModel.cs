@@ -22,6 +22,7 @@ namespace BDSM
         private bool _structuralChangesMade = false;
 
         public ObservableCollection<ClusterConfig> Clusters { get; set; }
+        public ICommand VerifyServerFilesCommand { get; }
 
         public ClusterConfig? SelectedCluster
         {
@@ -208,6 +209,7 @@ namespace BDSM
             OpenIniFolderCommand = new RelayCommand(_ => OpenFolder("Ini"), _ => IsServerSelected && IsSelectedServerInstalled);
             OpenInstallFolderCommand = new RelayCommand(_ => OpenFolder("Install"), _ => IsServerSelected && IsSelectedServerInstalled);
             OpenMapSaveFolderCommand = new RelayCommand(_ => OpenFolder("MapSave"), _ => IsServerSelected && IsSelectedServerInstalled);
+            VerifyServerFilesCommand = new RelayCommand(async _ => await VerifyServerFilesAsync(), _ => IsServerSelected && IsSelectedServerEditable && IsSelectedServerInstalled && !TaskSchedulerService.IsMajorOperationInProgress);
         }
 
         private void OpenFolder(string folderType)
@@ -562,5 +564,48 @@ namespace BDSM
 
             _structuralChangesMade = false;
         }
+
+        private async Task VerifyServerFilesAsync()
+        {
+            if (SelectedServer == null) return;
+
+            var liveServer = _appViewModel.Clusters
+                                          .SelectMany(c => c.Servers)
+                                          .FirstOrDefault(s => s.ServerId == SelectedServer.Id);
+
+            if (liveServer == null)
+            {
+                MessageBox.Show("Could not find the live server instance to verify.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var result = MessageBox.Show($"This will verify and repair the game files for '{liveServer.ServerName}' via SteamCMD. This can take a long time.\n\nAre you sure you want to continue?", "Confirm File Verification", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result == MessageBoxResult.No) return;
+
+            if (TaskSchedulerService.IsMajorOperationInProgress)
+            {
+                MessageBox.Show("Another major operation (like a backup or update) is already in progress. Please wait.", "Operation Locked", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            TaskSchedulerService.SetOperationLock();
+            try
+            {
+                await UpdateManager.RunSteamCmdUpdateForServerAsync(liveServer, _config);
+                await liveServer.CheckForUpdate(); // Refresh the build ID in the UI
+                liveServer.Status = "Stopped";
+                OnPropertyChanged(nameof(IsSelectedServerInstalled)); // Refresh the button states
+                NotificationService.ShowInfo($"File verification completed for {liveServer.ServerName}.");
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"An error occurred during file verification: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                TaskSchedulerService.ReleaseOperationLock();
+            }
+        }
+
     }
 }
