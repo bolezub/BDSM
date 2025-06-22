@@ -7,7 +7,7 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              mc:Ignorable="d" 
              d:DesignHeight="30" d:DesignWidth="800">
-    <Border Background="#2C2646" Padding="10,0">
+    <Border Background="Transparent" Padding="10,5">
         <StackPanel Orientation="Horizontal">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <materialDesign:PackIcon Kind="DatabaseSyncOutline" Foreground="LightGray" VerticalAlignment="Center"/>

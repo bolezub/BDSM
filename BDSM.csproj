@@ -6,20 +6,27 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>BDSM.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\image.png" />
+    <None Remove="Assets\logo.png" />
     <None Remove="Assets\splash.mp4" />
     <None Remove="Assets\splash.wmv" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Assets\logo.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Assets\splash.mp4">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Assets\splash.wmv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="BDSM.ico" />
   </ItemGroup>
 
   <ItemGroup>

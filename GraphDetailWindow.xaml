@@ -6,8 +6,13 @@
         xmlns:local="clr-namespace:BDSM"
         mc:Ignorable="d"
         Title="{Binding ServerName}" Height="480" Width="850"
-        WindowStartupLocation="CenterScreen"
-        Background="#1E1A2E">
+        WindowStartupLocation="CenterScreen">
+    <Window.Background>
+        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+            <GradientStop Color="#2C2646" Offset="0" />
+            <GradientStop Color="#1E1A2E" Offset="1" />
+        </LinearGradientBrush>
+    </Window.Background>
     <Grid Margin="10">
         <Image Source="{Binding GraphImage}" Stretch="Uniform" />
     </Grid>

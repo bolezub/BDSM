@@ -7,11 +7,18 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="Bole's Dedicated Server Manager" Height="720" Width="1280"
-        Background="#1E1A2E"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         TextElement.FontWeight="Regular"
         TextOptions.TextFormattingMode="Ideal"
-        TextOptions.TextRenderingMode="Auto">
+        TextOptions.TextRenderingMode="Auto"
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterScreen">
+
+    <Window.Background>
+        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+            <GradientStop Color="#2C2646" Offset="0" />
+            <GradientStop Color="#1E1A2E" Offset="1" />
+        </LinearGradientBrush>
+    </Window.Background>
 
     <Window.Resources>
         <DataTemplate DataType="{x:Type local:StatusBarViewModel}">
@@ -32,105 +39,182 @@
         <DataTemplate DataType="{x:Type local:WatchdogViewModel}">
             <local:WatchdogView/>
         </DataTemplate>
-
         <DataTemplate DataType="{x:Type local:ApplicationViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Clusters}" Margin="10">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Margin="0,10">
-                                <Border Background="#2C2646" CornerRadius="5,5,0,0" Padding="10,5">
-                                    <Grid>
+                            <Border Background="#44000000" CornerRadius="10" Margin="10" Padding="10">
+                                <Border.Effect>
+                                    <DropShadowEffect ShadowDepth="1" Color="Black" Opacity="0.4" BlurRadius="10"/>
+                                </Border.Effect>
+                                <DockPanel>
+                                    <Grid DockPanel.Dock="Top" Margin="5,0,5,10">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-
-                                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="20" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal">
                                             <Button Content="Start All" ToolTip="Start All Servers" Command="{Binding StartAllCommand}" Margin="2,0" Padding="8,2" FontSize="12"/>
                                             <Button Content="Stop All" ToolTip="Graceful Stop All Servers (15 min countdown)" Command="{Binding StopAllCommand}" Margin="2,0" Padding="8,2" FontSize="12"/>
-                                            <Button Content="Restart All" ToolTip="Gracefully Restart All Servers (15 min countdown, includes update)" Command="{Binding RestartAllCommand}" Margin="2,0" Padding="8,2" FontSize="12"/>
+                                            <Button Content="Restart All" ToolTip="Gracefully Restart All Servers (15 min countdown, includes update)" Command="{Binding RestartCommand}" Margin="2,0" Padding="8,2" FontSize="12"/>
                                             <Button Content="E-Stop All" ToolTip="Emergency Stop All Servers (Immediate DoExit)" Command="{Binding EmergencyStopAllCommand}" Margin="2,0" Padding="8,2" FontSize="12"/>
                                             <Button Content="Save All" ToolTip="Save World on All Servers" Command="{Binding SaveAllCommand}" Margin="2,0" Padding="8,2" FontSize="12"/>
                                             <Button Content="Message All" ToolTip="Send a message to all servers" Command="{Binding MessageAllCommand}" Margin="2,0" Padding="8,2" FontSize="12"/>
                                         </StackPanel>
                                     </Grid>
-                                </Border>
-
-                                <ItemsControl ItemsSource="{Binding Servers}" Margin="10,0,10,10">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <local:ServerStatusView/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
+                                    <Separator DockPanel.Dock="Top" Margin="5,0,5,5" Background="#44FFFFFF"/>
+                                    <ItemsControl ItemsSource="{Binding Servers}" Margin="5,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <local:ServerStatusView/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </DockPanel>
+                            </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
         </DataTemplate>
+
+        <Style x:Key="MainMenuButton" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="Padding" Value="10, 12"/>
+            <Setter Property="Margin" Value="15, 5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3B345E"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WindowCloseButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E81123"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
     </Window.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+    <Border BorderThickness="1" BorderBrush="#4C4669">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Background="#2C2646" Width="200">
-            <TextBlock Text="bole's dedicated server manager" Foreground="White" FontWeight="Bold" Margin="20" FontSize="16" TextWrapping="Wrap"/>
-
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,10,10,5" Command="{Binding ShowDashboardCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="ViewDashboard" Margin="0,0,10,0"/>
-                    <TextBlock Text="Dashboard"/>
+            <Grid Grid.ColumnSpan="2" Grid.Row="0" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Click="MinimizeButton_Click" Style="{StaticResource WindowCloseButtonStyle}" Foreground="Gray">
+                        <materialDesign:PackIcon Kind="WindowMinimize" />
+                    </Button>
+                    <Button Click="MaximizeButton_Click" Style="{StaticResource WindowCloseButtonStyle}" Foreground="Gray">
+                        <materialDesign:PackIcon Kind="WindowMaximize" />
+                    </Button>
+                    <Button Click="CloseButton_Click" Style="{StaticResource WindowCloseButtonStyle}">
+                        <materialDesign:PackIcon Kind="Close" />
+                    </Button>
                 </StackPanel>
-            </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowClustersCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="ServerNetwork" Margin="0,0,10,0"/>
-                    <TextBlock Text="Clusters"/>
-                </StackPanel>
-            </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowWatchdogCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Eye" Margin="0,0,10,0"/>
-                    <TextBlock Text="Watchdog"/>
-                </StackPanel>
-            </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowSchedulesCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="ClockOutline" Margin="0,0,10,0"/>
-                    <TextBlock Text="Schedules"/>
-                </StackPanel>
-            </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowBackupsCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="DatabaseSyncOutline" Margin="0,0,10,0"/>
-                    <TextBlock Text="Backups"/>
-                </StackPanel>
-            </Button>
-            <Button Style="{DynamicResource MaterialDesignTextButton}" HorizontalAlignment="Left" Margin="10,5" Command="{Binding ShowGlobalSettingsCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="CogBox" Margin="0,0,10,0"/>
-                    <TextBlock Text="Global Settings"/>
-                </StackPanel>
-            </Button>
-        </StackPanel>
+            </Grid>
 
-        <ContentControl Grid.Row="0" Grid.Column="1" Content="{Binding CurrentView}"/>
+            <StackPanel Grid.Row="0" Grid.Column="0" Grid.RowSpan="3" Width="200">
+                <StackPanel.Background>
+                    <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                        <GradientStop Color="#3C3464" Offset="0" />
+                        <GradientStop Color="#2C2646" Offset="1" />
+                    </LinearGradientBrush>
+                </StackPanel.Background>
 
-        <local:StatusBarView Grid.Row="1" Grid.Column="1" DataContext="{Binding StatusBar}"/>
+                <Image Source="/Assets/logo.png" Width="200" Height="200" Margin="0,0,0,0" Stretch="Uniform"/>
 
-        <materialDesign:Snackbar Grid.Row="0" Grid.Column="1" x:Name="MainSnackbar" MessageQueue="{materialDesign:MessageQueue}" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="0,0,0,10"/>
+                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowDashboardCommand}" IsChecked="True" GroupName="MainMenu">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ViewDashboard" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Dashboard" FontSize="14"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowClustersCommand}" GroupName="MainMenu">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ServerNetwork" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Clusters" FontSize="14"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowWatchdogCommand}" GroupName="MainMenu">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Eye" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Watchdog" FontSize="14"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowSchedulesCommand}" GroupName="MainMenu">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ClockOutline" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Schedules" FontSize="14"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowBackupsCommand}" GroupName="MainMenu">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="DatabaseSyncOutline" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Backups" FontSize="14"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowGlobalSettingsCommand}" GroupName="MainMenu">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="CogBox" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Global Settings" FontSize="14"/>
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
 
-    </Grid>
+            <ContentControl Grid.Row="1" Grid.Column="1" Content="{Binding CurrentView}"/>
 
+            <local:StatusBarView Grid.Row="2" Grid.Column="1" DataContext="{Binding StatusBar}"/>
+
+            <materialDesign:Snackbar Grid.Row="1" Grid.Column="1" x:Name="MainSnackbar" MessageQueue="{materialDesign:MessageQueue}" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="0,0,0,10"/>
+
+        </Grid>
+    </Border>
 </Window>

@@ -8,7 +8,10 @@
              mc:Ignorable="d" 
              d:DesignHeight="100" d:DesignWidth="1000"
              Visibility="{Binding IsHidden, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
-    <Border Background="#2C2646" CornerRadius="10" Margin="0,5">
+    <Border Background="#44000000" CornerRadius="10" Margin="0,5">
+        <Border.Effect>
+            <DropShadowEffect ShadowDepth="1" Color="Black" Opacity="0.4" BlurRadius="10"/>
+        </Border.Effect>
         <Grid Margin="15">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
