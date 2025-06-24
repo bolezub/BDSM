@@ -8,7 +8,7 @@
              mc:Ignorable="d" 
              d:DesignHeight="100" d:DesignWidth="1000"
              Visibility="{Binding IsHidden, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
-    <Border Background="#44000000" CornerRadius="10" Margin="0,5">
+    <Border Background="#1f0654" CornerRadius="10" Margin="0,5">
         <Border.Effect>
             <DropShadowEffect ShadowDepth="1" Color="Black" Opacity="0.4" BlurRadius="10"/>
         </Border.Effect>
@@ -35,7 +35,7 @@
                     <TextBlock Text="{Binding Status}" Foreground="LightGray" FontSize="12"/>
                     <TextBlock Text="{Binding Pid}" Foreground="LightGray" FontSize="12"/>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding ServerVersion}" Foreground="LightGray" FontSize="12" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ServerVersion}" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
                         <materialDesign:PackIcon Kind="CloudDownloadOutline" Foreground="Orange" Margin="5,0,0,0" VerticalAlignment="Center">
                             <materialDesign:PackIcon.Style>
                                 <Style TargetType="materialDesign:PackIcon">
@@ -82,7 +82,7 @@
             </Button>
 
             <Menu Grid.Column="5" VerticalAlignment="Center" Background="Transparent">
-                <MenuItem Header="{materialDesign:PackIcon Kind=DotsVertical, Size=24}" ToolTip="Server Actions">
+                <MenuItem Header="{materialDesign:PackIcon Kind=DotsVertical, Size=24}" ToolTip="Server Actions" Foreground="White">
                     <MenuItem Header="Start" Command="{Binding StartServerCommand}"/>
                     <MenuItem Header="Gracefully Stop" Command="{Binding StopServerCommand}"/>
                     <MenuItem Header="Gracefully Restart" Command="{Binding RestartServerCommand}"/>
