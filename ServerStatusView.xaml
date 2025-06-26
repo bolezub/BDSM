@@ -81,20 +81,40 @@
                 <materialDesign:PackIcon Kind="ChartLine" Width="24" Height="24" Foreground="White"/>
             </Button>
 
-            <Menu Grid.Column="5" VerticalAlignment="Center" Background="Transparent">
-                <MenuItem Header="{materialDesign:PackIcon Kind=DotsVertical, Size=24}" ToolTip="Server Actions" Foreground="White">
-                    <MenuItem Header="Start" Command="{Binding StartServerCommand}"/>
-                    <MenuItem Header="Gracefully Stop" Command="{Binding StopServerCommand}"/>
-                    <MenuItem Header="Gracefully Restart" Command="{Binding RestartServerCommand}"/>
+            <materialDesign:PopupBox Grid.Column="5" StaysOpen="False" VerticalAlignment="Center">
+                <materialDesign:PopupBox.ToggleContent>
+                    <materialDesign:PackIcon Kind="DotsVertical" Height="24" Width="24" Foreground="White" />
+                </materialDesign:PopupBox.ToggleContent>
+                <StackPanel>
+                    <StackPanel.Resources>
+                        <Style TargetType="Button" x:Key="PopupMenuItemStyle">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Foreground" Value="Black" />
+                            <Setter Property="HorizontalAlignment" Value="Stretch" />
+                            <Setter Property="HorizontalContentAlignment" Value="Left" />
+                            <Setter Property="Padding" Value="12,8" />
+                            <Setter Property="Cursor" Value="Hand" />
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#FFE0E0E0" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Resources>
+
+                    <Button Content="Start" Command="{Binding StartServerCommand}" Style="{StaticResource PopupMenuItemStyle}" />
+                    <Button Content="Gracefully Stop" Command="{Binding StopServerCommand}" Style="{StaticResource PopupMenuItemStyle}" />
+                    <Button Content="Gracefully Restart" Command="{Binding RestartServerCommand}" Style="{StaticResource PopupMenuItemStyle}" />
                     <Separator/>
-                    <MenuItem Header="Save World" Command="{Binding SaveWorldCommand}"/>
-                    <MenuItem Header="Send Message..." Command="{Binding SendMessageCommand}"/>
-                    <MenuItem Header="Send RCON Command..." Command="{Binding SendGenericRconCommand}"/>
+                    <Button Content="Save World" Command="{Binding SaveWorldCommand}" Style="{StaticResource PopupMenuItemStyle}" />
+                    <Button Content="Send Message..." Command="{Binding SendMessageCommand}" Style="{StaticResource PopupMenuItemStyle}" />
+                    <Button Content="Send RCON Command..." Command="{Binding SendGenericRconCommand}" Style="{StaticResource PopupMenuItemStyle}" />
                     <Separator/>
-                    <MenuItem Header="E-Stop (DoExit)" Command="{Binding EmergencyStopCommand}" Foreground="OrangeRed" FontWeight="Bold" />
-                    <MenuItem Header="Kill Process" Command="{Binding KillProcessCommand}" Foreground="Red" FontWeight="Bold"/>
-                </MenuItem>
-            </Menu>
+                    <Button Content="E-Stop (DoExit)" Command="{Binding EmergencyStopCommand}" Style="{StaticResource PopupMenuItemStyle}" Foreground="OrangeRed" FontWeight="Bold" />
+                    <Button Content="Kill Process" Command="{Binding KillProcessCommand}" Style="{StaticResource PopupMenuItemStyle}" Foreground="Red" FontWeight="Bold" />
+                </StackPanel>
+            </materialDesign:PopupBox>
         </Grid>
     </Border>
 </UserControl>

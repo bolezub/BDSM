@@ -82,14 +82,12 @@ namespace BDSM
             bool isInDesignMode = System.ComponentModel.DesignerProperties.GetIsInDesignMode(new DependencyObject());
             if (isInDesignMode) return false;
 
-            // NEW: Check if the config file exists.
             if (File.Exists("config.json"))
             {
                 _config = JsonConvert.DeserializeObject<GlobalConfig>(File.ReadAllText("config.json"));
             }
             else
             {
-                // If it doesn't exist, create a new one with defaults.
                 isFirstRun = true;
                 _config = new GlobalConfig
                 {
@@ -104,8 +102,6 @@ namespace BDSM
                     AppId = "2430930",
                     SteamApiUrl = "https://api.steamcmd.net/v1/info/2430930"
                 };
-
-                // Save the new default config file to disk.
                 string defaultConfigJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
                 File.WriteAllText("config.json", defaultConfigJson);
             }
@@ -116,7 +112,6 @@ namespace BDSM
 
             if (_config != null)
             {
-                // ... (The rest of the initialization logic remains the same, starting from here)
                 bool configWasModified = false;
                 if (_config.Clusters != null)
                 {
@@ -147,26 +142,13 @@ namespace BDSM
                 var versionCheckTasks = allServers.Select(server => server.CheckForUpdate()).ToList();
                 await Task.WhenAll(versionCheckTasks);
 
-                if (!TaskSchedulerService.IsMajorOperationInProgress)
-                {
-                    var serversNeedingUpdate = allServers.Where(s => s.IsUpdateAvailable).ToList();
-
-                    if (serversNeedingUpdate.Any(s => s.Status == "Starting"))
-                    {
-                        System.Diagnostics.Debug.WriteLine("Postponing startup update: One or more servers is still in the 'Starting' state.");
-                    }
-                    else if (serversNeedingUpdate.Any())
-                    {
-                        _ = UpdateManager.PerformUpdateProcessAsync(serversNeedingUpdate, _config);
-                    }
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("Skipping startup update check: A major operation was already in progress.");
-                }
-
                 DataLogger.InitializeDatabase(_config.BackupPath);
+
+                TaskSchedulerService.ClearLastRunHistory();
+
                 TaskSchedulerService.Start(_config, this);
+                TaskSchedulerService.PreventMissedTasksOnStartup(); // <-- THIS LINE IS THE ONLY ADDITION
+
                 BackupSchedulerService.Start(_config, this);
                 UpdateSchedulerService.Start(_config, this);
                 await WatchdogService.InitializeAndStart(_config, this);
@@ -178,7 +160,6 @@ namespace BDSM
             _dashboardView = this;
             CurrentView = _dashboardView;
 
-            // Return whether this was the first run or not.
             return isFirstRun;
         }
 

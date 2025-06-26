@@ -8,7 +8,7 @@ namespace BDSM
     {
         DailyReboot,
         MaintenanceShutdown,
-        ScheduledBackup // RENAMED from FrequentBackup
+        ScheduledBackup
     }
 
     public class ScheduledTask : BaseViewModel
@@ -45,35 +45,44 @@ namespace BDSM
             get
             {
                 if (!IsEnabled) return null;
-
                 var now = DateTime.Now;
-                for (int i = 0; i < 7; i++)
-                {
-                    var checkDay = DateTime.Today.AddDays(i);
-                    bool shouldRunOnThisDay = false;
-                    switch (checkDay.DayOfWeek)
-                    {
-                        case DayOfWeek.Monday: shouldRunOnThisDay = RunsOnMonday; break;
-                        case DayOfWeek.Tuesday: shouldRunOnThisDay = RunsOnTuesday; break;
-                        case DayOfWeek.Wednesday: shouldRunOnThisDay = RunsOnWednesday; break;
-                        case DayOfWeek.Thursday: shouldRunOnThisDay = RunsOnThursday; break;
-                        case DayOfWeek.Friday: shouldRunOnThisDay = RunsOnFriday; break;
-                        case DayOfWeek.Saturday: shouldRunOnThisDay = RunsOnSaturday; break;
-                        case DayOfWeek.Sunday: shouldRunOnThisDay = RunsOnSunday; break;
-                    }
 
-                    if (shouldRunOnThisDay)
+                // Search the next 14 days to find the very next future run time.
+                for (int i = 0; i < 14; i++)
+                {
+                    var checkDate = DateTime.Today.AddDays(i);
+                    if (IsScheduledForDay(checkDate.DayOfWeek))
                     {
-                        var nextRun = checkDay.Date + ScheduledTime;
-                        if (nextRun > now)
+                        var potentialRunTime = checkDate.Date + ScheduledTime;
+
+                        // If this potential time is in the future, we've found our match.
+                        if (potentialRunTime > now)
                         {
-                            return nextRun;
+                            return potentialRunTime;
                         }
                     }
                 }
+
+                // If no run time is found in the next 14 days (e.g., no days are checked), return null.
                 return null;
             }
         }
+
+        private bool IsScheduledForDay(DayOfWeek day)
+        {
+            return day switch
+            {
+                DayOfWeek.Monday => RunsOnMonday,
+                DayOfWeek.Tuesday => RunsOnTuesday,
+                DayOfWeek.Wednesday => RunsOnWednesday,
+                DayOfWeek.Thursday => RunsOnThursday,
+                DayOfWeek.Friday => RunsOnFriday,
+                DayOfWeek.Saturday => RunsOnSaturday,
+                DayOfWeek.Sunday => RunsOnSunday,
+                _ => false,
+            };
+        }
+
         public void Refresh()
         {
             OnPropertyChanged(nameof(NextCalculatedRunTime));

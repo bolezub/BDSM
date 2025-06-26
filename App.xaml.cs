@@ -11,13 +11,19 @@ namespace BDSM
         {
             base.OnStartup(e);
 
+            // 1. Create and show the splash screen on the UI thread.
+            SplashScreen splashScreen = new SplashScreen();
+            splashScreen.Show();
+
+            // 2. Start the main initialization on a background thread.
             Task.Run(async () =>
             {
                 var mainViewModel = new ApplicationViewModel();
 
-                // Wait for initialization and get the result.
+                // Wait for the long initialization to complete.
                 bool wasFirstRun = await mainViewModel.InitializationTask;
 
+                // 3. When done, switch back to the UI thread to transition windows.
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     var mainWindow = new MainWindow
@@ -36,6 +42,9 @@ namespace BDSM
                             MessageBoxButton.OK,
                             MessageBoxImage.Information);
                     }
+
+                    // 4. Close the splash screen now that the main window is visible.
+                    splashScreen.Close();
                 });
             });
         }

@@ -46,6 +46,12 @@ namespace BDSM
 
         public static void RecalculateNextRunTime()
         {
+            // --- ADD THIS DEBUG LOGGING ---
+            if (_config != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Recalculating backup time using interval: {_config.BackupIntervalMinutes} minutes.");
+            }
+            // --- END DEBUG LOGGING ---
             CalculateNextBackupTime();
             System.Diagnostics.Debug.WriteLine($"Backup timer reset due to settings change. New next backup at: {NextBackupTime}");
         }

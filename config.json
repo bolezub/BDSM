@@ -131,7 +131,9 @@
           "port": 1480,
           "queryPort": 14080,
           "rconPort": 14180,
-          "mapSpecificMods": [],
+          "mapSpecificMods": [
+            1005639
+          ],
           "discordNotificationsEnabled": true,
           "memoryThresholdGB": 35,
           "active": true,
@@ -164,7 +166,7 @@
       "Id": "024f182d-f752-4f4c-851a-1c6e04494151",
       "Name": "Daily",
       "TaskType": "DailyReboot",
-      "ScheduledTime": "06:30:00",
+      "ScheduledTime": "13:48:00",
       "IsEnabled": true,
       "RunsOnMonday": true,
       "RunsOnTuesday": true,
@@ -178,12 +180,12 @@
       "Id": "cb59c7df-6411-4366-a854-a0e18cb011f9",
       "Name": "Weekly Maintenance",
       "TaskType": "MaintenanceShutdown",
-      "ScheduledTime": "20:00:00",
+      "ScheduledTime": "13:55:00",
       "IsEnabled": true,
       "RunsOnMonday": false,
-      "RunsOnTuesday": true,
+      "RunsOnTuesday": false,
       "RunsOnWednesday": false,
-      "RunsOnThursday": false,
+      "RunsOnThursday": true,
       "RunsOnFriday": false,
       "RunsOnSaturday": false,
       "RunsOnSunday": false
@@ -193,8 +195,8 @@
     "isEnabled": true,
     "scanIntervalSeconds": 30,
     "graphPostIntervalMinutes": 2,
-    "textMessageId": "1385702736447934625",
-    "graphMessageId": ""
+    "textMessageId": "1387761645320798382",
+    "graphMessageId": "1387764490375921665"
   },
   "gameUserSettingsTemplatePath": "D:\\Servers\\Templates\\GameUserSettings.ini",
   "availableMaps": [

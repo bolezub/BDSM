@@ -7,23 +7,26 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
-  <Grid Margin="20">
-    <StackPanel>
-      <TextBlock Text="Server Backups" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+    <Grid Margin="20">
+        <StackPanel>
+            <TextBlock Text="Server Backups" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
 
-      <TextBlock Text="{Binding TimeUntilNextBackup}" Foreground="LimeGreen" FontSize="14" Margin="0,0,0,20"/>
+            <TextBlock Text="Use this section to manually trigger a backup of all active servers." Foreground="LightGray" Margin="0,0,0,20" TextWrapping="Wrap" MaxWidth="600"/>
 
-      <TextBlock Text="Use this section to manually trigger a backup of all active servers." Foreground="LightGray" Margin="0,0,0,20" TextWrapping="Wrap" MaxWidth="600"/>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text="{Binding TimeUntilNextBackup}" Foreground="Gold" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,20"/>
 
-      <Button Command="{Binding StartManualBackupCommand}"
-              Style="{DynamicResource MaterialDesignRaisedButton}"
-              HorizontalAlignment="Left"
-              ToolTip="This will save the world on all running servers and then create a backup .zip file for all active servers.">
-        <StackPanel Orientation="Horizontal">
-          <materialDesign:PackIcon Kind="DatabaseSyncOutline" Margin="0,0,10,0"/>
-          <TextBlock Text="Start Manual Backup Now"/>
+                    <Button Command="{Binding StartManualBackupCommand}"
+                      HorizontalAlignment="Left"
+                      ToolTip="This will save the world on all running servers and then create a backup .zip file for all active servers.">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DatabaseSyncOutline" Margin="0,0,10,0"/>
+                            <TextBlock Text="Start Manual Backup Now"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
         </StackPanel>
-      </Button>
-    </StackPanel>
-  </Grid>
+    </Grid>
 </UserControl>

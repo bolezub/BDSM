@@ -52,8 +52,6 @@ namespace BDSM
             set { _config.ServerIP = value; OnPropertyChanged(); }
         }
 
-        // RconPassword REMOVED from here
-
         public string DiscordWebhookUrl
         {
             get => _config.discordWebhookUrl;

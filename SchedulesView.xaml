@@ -15,56 +15,66 @@
 
         <StackPanel Grid.Column="0" Margin="0,0,20,0">
             <TextBlock Text="Scheduled Tasks" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,20"/>
-            <ListBox ItemsSource="{Binding ScheduledTasks}"
-                     SelectedItem="{Binding SelectedTask}"
-                     DisplayMemberPath="Name"
-                     Height="300"/>
+
+            <Border Style="{StaticResource CardBorderStyle}" Padding="5">
+                <ListBox ItemsSource="{Binding ScheduledTasks}"
+                         SelectedItem="{Binding SelectedTask}"
+                         DisplayMemberPath="Name"
+                         Height="300"/>
+            </Border>
+
             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                <Button Content="Add Task" Command="{Binding AddTaskCommand}" Style="{DynamicResource MaterialDesignFlatButton}"/>
-                <Button Content="Remove Task" Command="{Binding RemoveTaskCommand}" Style="{DynamicResource MaterialDesignFlatButton}" Foreground="Red" Margin="10,0,0,0"/>
+                <Button Content="Add Task" Command="{Binding AddTaskCommand}"/>
+                <Button Content="Remove Task" Command="{Binding RemoveTaskCommand}" Foreground="Red" Margin="10,0,0,0"/>
             </StackPanel>
         </StackPanel>
 
-        <GroupBox Grid.Column="1" Header="Selected Task Details"
-                  materialDesign:ThemeAssist.Theme="Dark"
-                  Padding="10"
-                  IsEnabled="{Binding IsTaskSelected}">
-            <StackPanel>
-                <TextBlock Text="Task Name:" Foreground="LightGray"/>
-                <TextBox Text="{Binding SelectedTask.Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,15"/>
+        <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" IsEnabled="{Binding IsTaskSelected}">
+            <GroupBox Header="Selected Task Details"
+                      materialDesign:ThemeAssist.Theme="Dark"
+                      Padding="10" BorderThickness="0">
+                <StackPanel>
+                    <TextBlock Text="Task Name:"/>
+                    <TextBox Text="{Binding EditingName, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,15"/>
 
-                <TextBlock Text="Task Type:" Foreground="LightGray"/>
-                <ComboBox ItemsSource="{Binding TaskTypes}" 
-                          SelectedItem="{Binding SelectedTask.TaskType}" Margin="0,5,0,15"/>
+                    <TextBlock Text="Task Type:"/>
+                    <ComboBox ItemsSource="{Binding TaskTypes}" 
+                              SelectedItem="{Binding EditingTaskType}" Margin="0,5,0,15">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Foreground="Black" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
 
-                <TextBlock Text="Scheduled Time (HH:mm):" Foreground="LightGray"/>
-                <TextBox Text="{Binding SelectedTask.ScheduledTime, UpdateSourceTrigger=PropertyChanged, StringFormat=hh\\:mm}" Margin="0,5,0,15"/>
+                    <TextBlock Text="Scheduled Time (HH:mm):"/>
+                    <TextBox Text="{Binding EditingScheduledTime, UpdateSourceTrigger=PropertyChanged, StringFormat=hh\\:mm}" Margin="0,5,0,15"/>
 
-                <CheckBox IsChecked="{Binding SelectedTask.IsEnabled}" Content="Task Enabled" Foreground="LightGray" Margin="0,0,0,15"/>
+                    <CheckBox IsChecked="{Binding EditingIsEnabled}" Content="Task Enabled" Margin="0,0,0,15"/>
 
-                <TextBlock Text="Run on Days:" Foreground="LightGray"/>
-                <UniformGrid Rows="1" Margin="0,5,0,15">
-                    <CheckBox IsChecked="{Binding SelectedTask.RunsOnMonday}" Content="Mon" Foreground="LightGray" Margin="0,0,5,0"/>
-                    <CheckBox IsChecked="{Binding SelectedTask.RunsOnTuesday}" Content="Tue" Foreground="LightGray" Margin="0,0,5,0"/>
-                    <CheckBox IsChecked="{Binding SelectedTask.RunsOnWednesday}" Content="Wed" Foreground="LightGray" Margin="0,0,5,0"/>
-                    <CheckBox IsChecked="{Binding SelectedTask.RunsOnThursday}" Content="Thu" Foreground="LightGray" Margin="0,0,5,0"/>
-                    <CheckBox IsChecked="{Binding SelectedTask.RunsOnFriday}" Content="Fri" Foreground="LightGray" Margin="0,0,5,0"/>
-                    <CheckBox IsChecked="{Binding SelectedTask.RunsOnSaturday}" Content="Sat" Foreground="LightGray" Margin="0,0,5,0"/>
-                    <CheckBox IsChecked="{Binding SelectedTask.RunsOnSunday}" Content="Sun" Foreground="LightGray" Margin="0,0,5,0"/>
-                </UniformGrid>
+                    <TextBlock Text="Run on Days:"/>
+                    <UniformGrid Rows="1" Margin="0,5,0,15">
+                        <CheckBox IsChecked="{Binding EditingRunsOnMonday}" Content="Mon" Margin="0,0,5,0"/>
+                        <CheckBox IsChecked="{Binding EditingRunsOnTuesday}" Content="Tue" Margin="0,0,5,0"/>
+                        <CheckBox IsChecked="{Binding EditingRunsOnWednesday}" Content="Wed" Margin="0,0,5,0"/>
+                        <CheckBox IsChecked="{Binding EditingRunsOnThursday}" Content="Thu" Margin="0,0,5,0"/>
+                        <CheckBox IsChecked="{Binding EditingRunsOnFriday}" Content="Fri" Margin="0,0,5,0"/>
+                        <CheckBox IsChecked="{Binding EditingRunsOnSaturday}" Content="Sat" Margin="0,0,5,0"/>
+                        <CheckBox IsChecked="{Binding EditingRunsOnSunday}" Content="Sun" Margin="0,0,5,0"/>
+                    </UniformGrid>
 
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Next scheduled run:" Foreground="LightGray"/>
-                    <TextBlock Text="{Binding SelectedTask.NextCalculatedRunTime, StringFormat='{}{0:g}'}" Foreground="White" FontWeight="Bold" Margin="5,0,0,0"/>
-                    <TextBlock Text="{Binding TimeUntilNextRun}" Foreground="LimeGreen" FontWeight="Bold" Margin="5,0,0,0"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Next scheduled run:"/>
+                        <TextBlock Text="{Binding SelectedTask.NextCalculatedRunTime, StringFormat='{}{0:g}'}" Foreground="White" FontWeight="Bold" Margin="5,0,0,0"/>
+                        <TextBlock Text="{Binding TimeUntilNextRun}" Foreground="Gold" FontWeight="Bold" Margin="5,0,0,0"/>
+                    </StackPanel>
+
+                    <Button Content="Save Schedules"
+                            Command="{Binding SaveSchedulesCommand}"
+                            HorizontalAlignment="Left"
+                            Margin="0,30,0,0"/>
                 </StackPanel>
-
-                <Button Content="Save Schedules"
-                        Command="{Binding SaveSchedulesCommand}"
-                        HorizontalAlignment="Left"
-                        Margin="0,30,0,0"
-                        Style="{DynamicResource MaterialDesignRaisedButton}"/>
-            </StackPanel>
-        </GroupBox>
+            </GroupBox>
+        </Border>
     </Grid>
 </UserControl>
