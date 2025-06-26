@@ -7,7 +7,6 @@ using LiveChartsCore.SkiaSharpView.VisualElements;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -22,15 +21,12 @@ namespace BDSM
             {
                 var rawData = await DataLogger.GetPerformanceDataAsync(server.ServerId, 24);
 
-                // NEW: Create a complete timeline for the last 24 hours, filling in gaps
                 var timeNow = DateTime.Now;
                 var startTime = timeNow.AddHours(-24);
                 var filledData = new List<PerformanceDataPoint>();
 
-                // We'll create a point every 10 minutes for a smooth-looking graph
                 for (var time = startTime; time <= timeNow; time = time.AddMinutes(10))
                 {
-                    // Find the closest data point we actually logged within a 10-minute window
                     var nearestPoint = rawData.OrderBy(p => Math.Abs((p.Timestamp - time).TotalMinutes))
                                               .FirstOrDefault(p => Math.Abs((p.Timestamp - time).TotalMinutes) < 10);
 
@@ -40,7 +36,6 @@ namespace BDSM
                     }
                     else
                     {
-                        // If no data found, it means the server was down. Log as 0.
                         filledData.Add(new PerformanceDataPoint { Timestamp = time, CpuUsage = 0, RamUsage = 0 });
                     }
                 }
@@ -101,12 +96,11 @@ namespace BDSM
 
                 await Task.Run(() => chart.SaveImage(filePath));
 
-                Debug.WriteLine($"Generated graph for {server.ServerName} at {filePath}");
                 return filePath;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"!!! FAILED to generate graph for {server.ServerName}: {ex.Message}");
+                // Error logging removed
                 return null;
             }
         }

@@ -183,7 +183,6 @@ namespace BDSM
             if (!string.IsNullOrWhiteSpace(adminPass))
             {
                 _serverConfig.RconPassword = adminPass;
-                Debug.WriteLine($"Password for {ServerName} loaded from .ini file.");
             }
         }
 
@@ -200,9 +199,9 @@ namespace BDSM
                 _serverProcess?.Kill(true);
                 NotificationService.ShowInfo($"Killed process for server {ServerName}.");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"Failed to kill process for {ServerName}: {ex.Message}");
+                // Error logging removed
             }
             Status = "Stopped";
             await Task.CompletedTask;
@@ -265,9 +264,8 @@ namespace BDSM
             {
                 Process.Start(new ProcessStartInfo(executablePath, arguments) { WorkingDirectory = Path.GetDirectoryName(executablePath), UseShellExecute = true, CreateNoWindow = false });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"Failed to start server {_serverConfig.Name}: {ex.Message}");
                 Status = "Stopped";
             }
         }
@@ -277,7 +275,7 @@ namespace BDSM
             while (true)
             {
                 try { await UpdateServerStatus(); }
-                catch (Exception ex) { Debug.WriteLine($"!!! UNEXPECTED ERROR in monitoring loop for {FullServerName}: {ex.Message}"); }
+                catch (Exception) { }
                 await Task.Delay(TimeSpan.FromSeconds(10));
             }
         }
@@ -290,9 +288,8 @@ namespace BDSM
             {
                 await SendRconCommandAsync("DoExit");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"RCON command to stop server {FullServerName} failed: {ex.Message}. Forcing shutdown.");
                 _serverProcess?.Kill();
             }
         }
@@ -310,7 +307,6 @@ namespace BDSM
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"RCON command '{command}' to server {ServerName} failed: {ex.Message}.");
                 throw;
             }
             finally
@@ -322,10 +318,7 @@ namespace BDSM
         private bool IsValidPlayerListResponse(string rconResponse)
         {
             if (string.IsNullOrWhiteSpace(rconResponse)) return false;
-            // A server that is starting but not fully ready might refuse the connection or return an error.
-            // We consider any response that isn't an explicit player list (or "No Players Connected") as invalid.
             if (rconResponse.Contains("No Players Connected")) return true;
-            // A valid player list contains at least one comma (e.g., "1. PlayerName, PlayerID")
             return rconResponse.Trim().Split('\n').Any(line => line.Contains(","));
         }
 
@@ -416,9 +409,8 @@ namespace BDSM
                     _lastCpuSampleTime = DateTime.UtcNow;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"Could not update performance metrics for {_serverProcess.ProcessName}. {ex.Message}");
                 CpuUsage = 0; RamUsage = 0;
                 _cpuCounter?.Dispose(); _cpuCounter = null;
             }
@@ -448,7 +440,7 @@ namespace BDSM
             try
             {
                 if (process.HasExited) return false;
-                string processPath = process.MainModule?.FileName ?? string.Empty;
+                string? processPath = process.MainModule?.FileName ?? string.Empty;
                 if (string.IsNullOrEmpty(processPath)) return false;
                 return Path.GetFullPath(processPath).StartsWith(Path.GetFullPath(_serverConfig.InstallDir), StringComparison.OrdinalIgnoreCase);
             }

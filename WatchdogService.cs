@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -9,7 +8,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json; // For saving config
+using Newtonsoft.Json;
 
 namespace BDSM
 {
@@ -24,20 +23,16 @@ namespace BDSM
         public static DateTime NextScanTime { get; private set; }
         public static DateTime NextGraphPostTime { get; private set; }
 
-        // FIX: The Start method is removed and its logic is merged into InitializeAndStart.
         public static async Task InitializeAndStart(GlobalConfig config, ApplicationViewModel appViewModel)
         {
-            // FIX: Set the configuration and view model references first.
             _config = config;
             _appViewModel = appViewModel;
 
             if (!_config.Watchdog.IsEnabled)
             {
-                Debug.WriteLine("Watchdog service is disabled in settings.");
                 return;
             }
 
-            // The rest of the startup logic can now execute safely.
             await DeleteOldMessage(isGraphMessage: false);
             await DeleteOldMessage(isGraphMessage: true);
 
@@ -49,7 +44,6 @@ namespace BDSM
             if (_config == null || !_config.Watchdog.IsEnabled)
             {
                 _watchdogTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-                Debug.WriteLine("Watchdog service stopped or disabled.");
                 return;
             }
 
@@ -69,7 +63,6 @@ namespace BDSM
             {
                 _watchdogTimer.Change(interval, Timeout.InfiniteTimeSpan);
             }
-            Debug.WriteLine($"Watchdog timer restarted. Next scan in: {interval.TotalSeconds} seconds.");
         }
 
         private static void OnTimerTick(object? state)
@@ -128,7 +121,6 @@ namespace BDSM
         private static async Task PostGraphsAsync()
         {
             if (_appViewModel == null) return;
-            Debug.WriteLine("Starting graph generation and posting...");
 
             var imagePaths = new List<string>();
             var servers = _appViewModel.Clusters
@@ -147,7 +139,6 @@ namespace BDSM
 
             if (!imagePaths.Any())
             {
-                Debug.WriteLine("No graphs generated, skipping Discord post.");
                 return;
             }
 
@@ -175,9 +166,8 @@ namespace BDSM
             {
                 var deleteUrl = $"{webhookUrl.TrimEnd('/')}/messages/{messageId}";
                 await _httpClient.DeleteAsync(deleteUrl);
-                Debug.WriteLine($"Deleted old message {messageId} on startup.");
             }
-            catch (Exception ex) { Debug.WriteLine($"Could not delete old message {messageId}: {ex.Message}"); }
+            catch (Exception) { }
             finally
             {
                 if (isGraphMessage) _config.Watchdog.GraphMessageId = string.Empty;
@@ -214,7 +204,7 @@ namespace BDSM
                     }
                     else return;
                 }
-                catch (Exception ex) { Debug.WriteLine($"Error patching Discord message: {ex.Message}"); return; }
+                catch (Exception) { return; }
             }
 
             try
@@ -246,7 +236,7 @@ namespace BDSM
                     }
                 }
             }
-            catch (Exception ex) { Debug.WriteLine($"Error posting new Discord message: {ex.Message}"); }
+            catch (Exception) { }
         }
 
         private static async Task SaveConfigAsync()
@@ -257,9 +247,9 @@ namespace BDSM
                 string json = JsonConvert.SerializeObject(_config, Formatting.Indented);
                 await File.WriteAllTextAsync("config.json", json);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"Failed to save config from WatchdogService: {ex.Message}");
+                // Error logging removed
             }
         }
 

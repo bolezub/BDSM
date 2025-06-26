@@ -52,7 +52,6 @@ namespace BDSM
 
                 if (_selectedServer != null)
                 {
-                    // Find the corresponding live ServerViewModel by its internal name
                     _liveSelectedServer = _appViewModel.Clusters
                         .SelectMany(c => c.Servers)
                         .FirstOrDefault(svm => svm.ServerName == _selectedServer.Name.Replace("ASA ", ""));
@@ -224,7 +223,6 @@ namespace BDSM
                 switch (folderType)
                 {
                     case "Root":
-                        // Path is already the InstallDir
                         break;
                     case "Ini":
                         path = Path.Combine(SelectedServer.InstallDir, "ShooterGame", "Saved", "Config", "WindowsServer");
@@ -313,7 +311,7 @@ namespace BDSM
             return SelectedServer.Port > 0 &&
                    SelectedServer.QueryPort > 0 &&
                    SelectedServer.RconPort > 0 &&
-                   !string.IsNullOrWhiteSpace(SelectedServer.RconPassword); // Password is now required
+                   !string.IsNullOrWhiteSpace(SelectedServer.RconPassword);
         }
 
         private bool AreSelectedServerPortsConflictFree()
@@ -443,9 +441,8 @@ namespace BDSM
                 finalMessage = "Server installation process has completed.";
                 if (!string.IsNullOrWhiteSpace(_config.GameUserSettingsTemplatePath) && File.Exists(_config.GameUserSettingsTemplatePath))
                 {
-                    System.Diagnostics.Debug.WriteLine("Template file found. Applying template...");
                     string destIniPath = Path.Combine(SelectedServer.InstallDir, "ShooterGame", "Saved", "Config", "WindowsServer", "GameUserSettings.ini");
-                    string destDir = Path.GetDirectoryName(destIniPath);
+                    string? destDir = Path.GetDirectoryName(destIniPath);
                     if (destDir != null) Directory.CreateDirectory(destDir);
 
                     File.Copy(_config.GameUserSettingsTemplatePath, destIniPath, true);
@@ -460,10 +457,6 @@ namespace BDSM
                     await iniManager.SaveAsync();
 
                     finalMessage += " Configuration template was applied successfully.";
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("Template file not found or path not configured. Skipping template application.");
                 }
             }
             catch (System.Exception ex)
@@ -534,7 +527,6 @@ namespace BDSM
         {
             if (SelectedCluster != null)
             {
-                // Sync the reordered list back to the main config object before saving
                 SelectedCluster.Servers = ServersInSelectedCluster.ToList();
             }
 
@@ -547,12 +539,9 @@ namespace BDSM
             catch (System.Exception ex)
             {
                 MessageBox.Show($"Failed to save settings: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return; // Stop if we can't save
+                return;
             }
 
-            // Since this button no longer affects live servers, we can remove the complex checks
-            // and just show a simple confirmation. The restart message is still relevant for
-            // adding/removing servers.
             if (_structuralChangesMade)
             {
                 MessageBox.Show("Settings saved to config.json! You have made structural changes (added/removed a server or cluster). Please restart the application for these changes to be fully reflected on the dashboard.", "Restart Recommended", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -592,9 +581,9 @@ namespace BDSM
             try
             {
                 await UpdateManager.RunSteamCmdUpdateForServerAsync(liveServer, _config);
-                await liveServer.CheckForUpdate(); // Refresh the build ID in the UI
+                await liveServer.CheckForUpdate();
                 liveServer.Status = "Stopped";
-                OnPropertyChanged(nameof(IsSelectedServerInstalled)); // Refresh the button states
+                OnPropertyChanged(nameof(IsSelectedServerInstalled));
                 NotificationService.ShowInfo($"File verification completed for {liveServer.ServerName}.");
             }
             catch (System.Exception ex)
@@ -606,6 +595,5 @@ namespace BDSM
                 TaskSchedulerService.ReleaseOperationLock();
             }
         }
-
     }
 }

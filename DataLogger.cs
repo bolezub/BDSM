@@ -16,7 +16,6 @@ namespace BDSM
             {
                 if (string.IsNullOrWhiteSpace(basePath) || !Directory.Exists(basePath))
                 {
-                    System.Diagnostics.Debug.WriteLine($"!!! DATABASE INITIALIZATION FAILED: Base path is invalid or does not exist.");
                     return;
                 }
 
@@ -27,7 +26,6 @@ namespace BDSM
                     connection.Open();
 
                     var command = connection.CreateCommand();
-                    // FIX: Change ServerName column to ServerId for unique tracking
                     command.CommandText =
                     @"
                         CREATE TABLE IF NOT EXISTS PerformanceLogs (
@@ -42,13 +40,12 @@ namespace BDSM
                     command.ExecuteNonQuery();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                System.Diagnostics.Debug.WriteLine($"!!! DATABASE INITIALIZATION FAILED: {ex.Message}");
+                // Error logging removed
             }
         }
 
-        // FIX: Log data against the server's unique Guid
         public static async Task LogDataPoint(Guid serverId, float cpuUsage, int ramUsage)
         {
             if (string.IsNullOrEmpty(_databaseFile)) return;
@@ -74,9 +71,9 @@ namespace BDSM
                     await command.ExecuteNonQueryAsync();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                System.Diagnostics.Debug.WriteLine($"!!! FAILED to write performance data to database for {serverId}: {ex.Message}");
+                // Error logging removed
             }
         }
 
@@ -117,9 +114,9 @@ namespace BDSM
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                System.Diagnostics.Debug.WriteLine($"!!! FAILED to read performance data for {serverId}: {ex.Message}");
+                // Error logging removed
             }
 
             return dataPoints;

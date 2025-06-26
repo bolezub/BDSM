@@ -13,18 +13,15 @@ namespace BDSM
     {
         private static readonly HttpClient httpClient = new HttpClient();
 
-        // --- NEW: Semaphore to ensure only one message is sent at a time ---
         private static readonly SemaphoreSlim _discordSemaphore = new SemaphoreSlim(1, 1);
 
         public static async Task SendMessageAsync(string webhookUrl, string serverName, string message, List<string>? players = null)
         {
             if (string.IsNullOrEmpty(webhookUrl))
             {
-                System.Diagnostics.Debug.WriteLine("Discord webhook URL is not configured. Skipping notification.");
                 return;
             }
 
-            // Wait for the semaphore. If another message is being sent, this will pause here.
             await _discordSemaphore.WaitAsync();
             try
             {
@@ -48,20 +45,17 @@ namespace BDSM
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error sending Discord notification: {response.StatusCode}");
+                    // Error logging removed
                 }
 
-                // --- NEW: Wait for 1.1 seconds after sending a message to avoid rate limits ---
-                // This mimics the 'Start-Sleep -Seconds 1' from your PowerShell script.
                 await Task.Delay(1100);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                System.Diagnostics.Debug.WriteLine($"!!! FAILED to send Discord notification: {ex.Message}");
+                // Error logging removed
             }
             finally
             {
-                // Release the semaphore so the next message in the queue can be sent.
                 _discordSemaphore.Release();
             }
         }

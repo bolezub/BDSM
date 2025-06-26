@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Reflection;
 using System.Threading.Tasks;
 using Discord;
@@ -22,13 +21,11 @@ namespace BDSM
 
             if (string.IsNullOrWhiteSpace(_config.BotToken))
             {
-                Debug.WriteLine("Discord Bot Token is not configured. Bot will not be started.");
                 return;
             }
 
             _client = new DiscordSocketClient(new DiscordSocketConfig
             {
-                // We are removing 'AllUnprivileged' and specifying only what we need.
                 GatewayIntents = GatewayIntents.Guilds |
                                  GatewayIntents.GuildMessages |
                                  GatewayIntents.MessageContent |
@@ -47,9 +44,9 @@ namespace BDSM
                 await _client.LoginAsync(TokenType.Bot, _config.BotToken);
                 await _client.StartAsync();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"!!! Discord Bot failed to start: {ex.Message}");
+                // Error logging removed
             }
         }
 
@@ -64,15 +61,11 @@ namespace BDSM
 
         private static Task OnReady()
         {
-            // FIX: Added null-conditional operator ?. to CurrentUser to prevent crash on startup.
-            Debug.WriteLine($"Discord Bot connected successfully as {_client?.CurrentUser?.Username ?? "Unknown User"}");
             return Task.CompletedTask;
         }
 
         private static Task Log(LogMessage msg)
         {
-            // Reverted to the original, correct code.
-            Debug.WriteLine($"Discord Bot Log: {msg.ToString()}");
             return Task.CompletedTask;
         }
     }

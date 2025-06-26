@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -32,7 +31,6 @@ namespace BDSM
         public static void ClearLastRunHistory()
         {
             _lastRunTimestamps.Clear();
-            Debug.WriteLine("Scheduler history cleared on startup.");
         }
 
         public static void Start(GlobalConfig config, ApplicationViewModel appViewModel)
@@ -42,11 +40,6 @@ namespace BDSM
             UpdateNextScheduledTask();
         }
 
-        // --- NEW METHOD ---
-        /// <summary>
-        /// Prevents the scheduler from running tasks that were missed while the application was closed.
-        /// It does this by pre-populating the run history for any tasks scheduled for earlier today.
-        /// </summary>
         public static void PreventMissedTasksOnStartup()
         {
             if (_config == null) return;
@@ -54,7 +47,6 @@ namespace BDSM
             var now = DateTime.Now;
             var today = now.Date;
 
-            // Find all tasks scheduled for today whose time has already passed.
             var pastTasksForToday = _config.Schedules.Where(s =>
             {
                 if (!s.IsEnabled) return false;
@@ -73,18 +65,14 @@ namespace BDSM
 
                 if (!runsToday) return false;
 
-                // Check if the scheduled time for today is in the past
                 return today + s.ScheduledTime < now;
             });
 
-            // For each of these tasks, add a record to the history as if it has already run.
             foreach (var task in pastTasksForToday)
             {
                 _lastRunTimestamps[task.Id] = today + task.ScheduledTime;
-                Debug.WriteLine($"[Startup] Pre-emptively marking past task '{task.Name}' (scheduled for {task.ScheduledTime}) as complete for today to prevent re-run.");
             }
         }
-
 
         public static void UpdateNextScheduledTask()
         {
@@ -138,7 +126,6 @@ namespace BDSM
                 }
 
                 _lastRunTimestamps[taskToRun.Id] = thisRunInstance;
-                Debug.WriteLine($"!!! TASK TRIGGERED: '{taskToRun.Name}'. Setting flag and executing. !!!");
 
                 _ = Task.Run(async () =>
                 {

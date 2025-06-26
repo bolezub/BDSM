@@ -1,10 +1,9 @@
 ﻿using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text.Json.Serialization; // Required for the fix
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace BDSM
@@ -35,9 +34,9 @@ namespace BDSM
                     }
                 }
             }
-            catch (HttpRequestException e)
+            catch (HttpRequestException)
             {
-                Debug.WriteLine($"Error fetching from GitHub API: {e.Message}");
+                // Error logging removed
             }
             return null;
         }
@@ -51,14 +50,10 @@ namespace BDSM
             {
                 Directory.CreateDirectory(installPath);
 
-                Debug.WriteLine($"Downloading API version {releaseInfo.Version} from {releaseInfo.DownloadUrl}");
                 var zipBytes = await httpClient.GetByteArrayAsync(releaseInfo.DownloadUrl);
                 await File.WriteAllBytesAsync(tempZipPath, zipBytes);
-                Debug.WriteLine("Download complete.");
 
-                Debug.WriteLine($"Extracting to {installPath}");
                 ZipFile.ExtractToDirectory(tempZipPath, installPath, true);
-                Debug.WriteLine("Extraction complete.");
             }
             finally
             {
@@ -69,7 +64,6 @@ namespace BDSM
             }
         }
 
-        // --- CORRECTED HELPER CLASSES ---
         public class GithubRelease
         {
             [JsonPropertyName("tag_name")]

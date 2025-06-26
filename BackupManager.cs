@@ -14,7 +14,6 @@ namespace BDSM
         {
             if (TaskSchedulerService.IsMajorOperationInProgress)
             {
-                Debug.WriteLine("Backup skipped: A major operation is already in progress.");
                 return;
             }
 
@@ -45,7 +44,6 @@ namespace BDSM
 
             if (!File.Exists(worldFilePath))
             {
-                Debug.WriteLine($"Backup: Could not find world file for {server.ServerName} at {worldFilePath}. Skipping save.");
                 return;
             }
 
@@ -53,26 +51,23 @@ namespace BDSM
             {
                 DateTime originalWriteTime = File.GetLastWriteTimeUtc(worldFilePath);
 
-                Debug.WriteLine($"Backup: Sending SaveWorld command to {server.ServerName}. Original save time: {originalWriteTime}");
                 await server.SendRconCommandAsync("SaveWorld");
 
                 Stopwatch timeout = Stopwatch.StartNew();
                 while (timeout.Elapsed.TotalSeconds < 60)
                 {
-                    await Task.Delay(2000); // Check every 2 seconds
+                    await Task.Delay(2000);
                     DateTime currentWriteTime = File.GetLastWriteTimeUtc(worldFilePath);
 
                     if (currentWriteTime > originalWriteTime)
                     {
-                        Debug.WriteLine($"Backup: New save file detected for {server.ServerName} at {currentWriteTime}. Save complete.");
                         return;
                     }
                 }
-                Debug.WriteLine($"Backup WARNING: Timed out waiting for {server.ServerName} to save. Proceeding with backup anyway.");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"Backup ERROR: Failed to force-save or wait for {server.ServerName}. {ex.Message}");
+                // Error logging removed
             }
         }
 
@@ -85,7 +80,6 @@ namespace BDSM
                     string saveDir = Path.Combine(server.InstallDir, "ShooterGame", "Saved", "SavedArks");
                     if (!Directory.Exists(saveDir))
                     {
-                        Debug.WriteLine($"Backup: Save directory not found for {server.ServerName} at {saveDir}. Skipping backup.");
                         return;
                     }
 
@@ -94,8 +88,6 @@ namespace BDSM
 
                     string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
                     string archivePath = Path.Combine(serverBackupDir, $"{timestamp}.zip");
-
-                    Debug.WriteLine($"Backup: Creating archive for {server.ServerName} at {archivePath}");
 
                     if (File.Exists(archivePath)) File.Delete(archivePath);
 
@@ -109,11 +101,10 @@ namespace BDSM
                             archive.CreateEntryFromFile(filePath, Path.GetFileName(filePath), CompressionLevel.Optimal);
                         }
                     }
-                    Debug.WriteLine($"Backup: Successfully created archive for {server.ServerName}.");
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.WriteLine($"Backup ERROR: Failed to create backup archive for {server.ServerName}. {ex.Message}");
+                    // Error logging removed
                 }
             });
         }
@@ -124,7 +115,6 @@ namespace BDSM
             {
                 try
                 {
-                    Debug.WriteLine("Backup: Cleaning up old backups...");
                     var allBackups = Directory.GetFiles(config.BackupPath, "*.zip", SearchOption.AllDirectories);
                     int filesDeleted = 0;
                     DateTime cutoff = DateTime.Now.AddDays(-30);
@@ -137,11 +127,10 @@ namespace BDSM
                             filesDeleted++;
                         }
                     }
-                    Debug.WriteLine($"Backup: Cleanup complete. Deleted {filesDeleted} old backup files.");
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.WriteLine($"Backup ERROR: Failed during old backup cleanup. {ex.Message}");
+                    // Error logging removed
                 }
             });
         }

@@ -26,7 +26,6 @@ namespace BDSM
         {
             if (TaskSchedulerService.IsMajorOperationInProgress)
             {
-                Debug.WriteLine("Update Process skipped: A major operation is already in progress.");
                 return;
             }
 
@@ -35,7 +34,6 @@ namespace BDSM
             {
                 var updateTasks = allServersToUpdate.Select(server => HandleSingleServerUpdate(server, config, shouldRestart: server.Status == "Running")).ToList();
                 await Task.WhenAll(updateTasks);
-                Debug.WriteLine("All update tasks have been processed.");
             }
             finally
             {
@@ -47,36 +45,25 @@ namespace BDSM
         {
             if (TaskSchedulerService.IsMajorOperationInProgress)
             {
-                Debug.WriteLine("Simple Reboot skipped: A major operation is already in progress.");
                 return;
             }
             TaskSchedulerService.SetOperationLock();
             try
             {
-                // --- MODIFIED LOGIC STARTS HERE ---
-
-                // 1. Identify and shut down only the active servers that are currently running.
                 var runningServers = activeServers.Where(s => s.Status == "Running").ToList();
                 if (runningServers.Any())
                 {
                     await GracefulShutdownAsync(runningServers, config, "scheduled restart", false);
                 }
 
-                // 2. After shutdown, iterate through the COMPLETE list of all active servers.
-                //    This includes servers that were just stopped AND servers that were already stopped.
                 foreach (var server in activeServers)
                 {
-                    // 3. If any active server is in the "Stopped" state, start it.
                     if (server.Status == "Stopped")
                     {
-                        Debug.WriteLine($"DailyReboot: Starting server '{server.ServerName}' as part of the scheduled task.");
                         server.StartServer();
-                        // Add a small delay between server starts to prevent overwhelming the system.
                         await Task.Delay(5000);
                     }
                 }
-
-                // --- MODIFIED LOGIC ENDS HERE ---
             }
             finally
             {
@@ -86,7 +73,6 @@ namespace BDSM
 
         public static async Task InstallServerAsync(ServerConfig serverConfig, GlobalConfig globalConfig)
         {
-            Debug.WriteLine($"Starting installation for {serverConfig.Name} in {serverConfig.InstallDir}");
             string steamCmdArgs = $"+login anonymous +force_install_dir \"{serverConfig.InstallDir}\" +app_update {globalConfig.AppId} validate +quit";
             var processStartInfo = new ProcessStartInfo
             {
@@ -95,12 +81,11 @@ namespace BDSM
                 UseShellExecute = true,
                 CreateNoWindow = false
             };
-            Debug.WriteLine($"Starting SteamCMD for {serverConfig.Name}");
+
             var process = Process.Start(processStartInfo);
             if (process != null)
             {
                 await process.WaitForExitAsync();
-                Debug.WriteLine($"SteamCMD installation finished for {serverConfig.Name}.");
             }
         }
 
@@ -108,7 +93,6 @@ namespace BDSM
         {
             if (TaskSchedulerService.IsMajorOperationInProgress)
             {
-                Debug.WriteLine("Maintenance shutdown skipped: A major operation is already in progress.");
                 return;
             }
             TaskSchedulerService.SetOperationLock();
@@ -121,7 +105,6 @@ namespace BDSM
                 if (shutdownTasks.Any())
                 {
                     await GracefulShutdownAsync(shutdownTasks, config, "maintenance", false);
-                    Debug.WriteLine("All maintenance shutdown tasks have been processed.");
                 }
             }
             finally
@@ -134,7 +117,6 @@ namespace BDSM
         {
             if (TaskSchedulerService.IsMajorOperationInProgress)
             {
-                Debug.WriteLine("Scheduled reboot with update skipped: A major operation is already in progress.");
                 return;
             }
             TaskSchedulerService.SetOperationLock();
@@ -142,7 +124,6 @@ namespace BDSM
             {
                 var rebootTasks = activeServers.Select(server => HandleSingleServerUpdate(server, config, shouldRestart: true)).ToList();
                 await Task.WhenAll(rebootTasks);
-                Debug.WriteLine("All scheduled reboot with update tasks have been processed.");
             }
             finally
             {
@@ -209,7 +190,6 @@ namespace BDSM
             {
                 if (!servers.Any(s => s.CurrentPlayers > 0))
                 {
-                    Debug.WriteLine("All servers are empty. Shutting down early.");
                     break;
                 }
 
@@ -248,20 +228,18 @@ namespace BDSM
 
         private static async Task WaitForExit(ServerViewModel server, GlobalConfig config)
         {
-            Debug.WriteLine($"Waiting for server {server.ServerName} process to exit...");
             Stopwatch stopwatch = Stopwatch.StartNew();
             while (stopwatch.Elapsed.TotalSeconds < config.ShutdownTimeoutSeconds)
             {
                 if (server.ServerProcess == null || server.ServerProcess.HasExited)
                 {
-                    Debug.WriteLine($"Server {server.ServerName} process has exited gracefully.");
                     server.Status = "Stopped";
                     return;
                 }
                 await Task.Delay(1000);
             }
             stopwatch.Stop();
-            Debug.WriteLine($"WARNING: Server {server.ServerName} did not shut down within {config.ShutdownTimeoutSeconds} seconds. Forcing kill.");
+
             await server.KillProcessAsync(force: true);
             server.Status = "Stopped";
         }
@@ -275,12 +253,11 @@ namespace BDSM
             {
                 try
                 {
-                    Debug.WriteLine($"Clearing manifest for {server.ServerName}");
                     await File.WriteAllTextAsync(manifestPath, "");
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.WriteLine($"Could not clear manifest file for {server.ServerName}: {ex.Message}");
+                    // Error logging removed
                 }
             }
             string steamCmdArgs = $"+login anonymous +force_install_dir \"{server.InstallDir}\" +app_update {config.AppId} validate +quit";
@@ -291,12 +268,11 @@ namespace BDSM
                 UseShellExecute = false,
                 CreateNoWindow = false
             };
-            Debug.WriteLine($"Starting SteamCMD for {server.ServerName}");
+
             var process = Process.Start(processStartInfo);
             if (process != null)
             {
                 await process.WaitForExitAsync();
-                Debug.WriteLine($"SteamCMD update finished for {server.ServerName}.");
             }
         }
 
@@ -333,9 +309,8 @@ namespace BDSM
                 Match match = Regex.Match(content, @"""buildid""\s+""(\d+)""");
                 return match.Success ? match.Groups[1].Value : "Unknown";
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"Failed to read buildid: {ex.Message}");
                 return "Error";
             }
         }
@@ -349,9 +324,8 @@ namespace BDSM
                 string? buildId = jsonResponse?["data"]?[appId]?["depots"]?["branches"]?["public"]?["buildid"]?.ToString();
                 return buildId;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"Failed to get latest buildid from Steam API: {ex.Message}");
                 return null;
             }
         }

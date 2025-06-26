@@ -147,7 +147,7 @@ namespace BDSM
                 TaskSchedulerService.ClearLastRunHistory();
 
                 TaskSchedulerService.Start(_config, this);
-                TaskSchedulerService.PreventMissedTasksOnStartup(); // <-- THIS LINE IS THE ONLY ADDITION
+                TaskSchedulerService.PreventMissedTasksOnStartup();
 
                 BackupSchedulerService.Start(_config, this);
                 UpdateSchedulerService.Start(_config, this);
