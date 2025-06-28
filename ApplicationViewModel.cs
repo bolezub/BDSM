@@ -26,6 +26,7 @@ namespace BDSM
         private object? _backupsView;
         private object? _globalSettingsView;
         private object? _watchdogView;
+        private object? _eventLogView;
 
         public ICommand CheckAllServersForUpdateCommand { get; }
         public ICommand StartUpdateCommand { get; }
@@ -35,7 +36,15 @@ namespace BDSM
         public ICommand ShowBackupsCommand { get; }
         public ICommand ShowGlobalSettingsCommand { get; }
         public ICommand ShowWatchdogCommand { get; }
+        public ICommand ShowEventLogCommand { get; }
         public StatusBarViewModel StatusBar { get; }
+
+        private bool _hasNewErrorLogs;
+        public bool HasNewErrorLogs
+        {
+            get => _hasNewErrorLogs;
+            private set { _hasNewErrorLogs = value; OnPropertyChanged(); }
+        }
 
         public object? CurrentView
         {
@@ -69,11 +78,32 @@ namespace BDSM
                 if (_watchdogView == null && _config != null) { _watchdogView = new WatchdogView { DataContext = new WatchdogViewModel(_config) }; }
                 CurrentView = _watchdogView;
             });
+            ShowEventLogCommand = new RelayCommand(_ => {
+                // Lazily create the view model
+                if (_eventLogView == null) { _eventLogView = new EventLogView { DataContext = new EventLogViewModel() }; }
+                // Refresh the log every time it's viewed
+                else { ((_eventLogView as EventLogView).DataContext as EventLogViewModel).RefreshLogCommand.Execute(null); }
+                CurrentView = _eventLogView;
+                HasNewErrorLogs = false; // "Read" the new logs
+            });
 
-            CheckAllServersForUpdateCommand = new RelayCommand(async _ => await CheckAllServersForUpdate(), _ => !TaskSchedulerService.IsMajorOperationInProgress);
-            StartUpdateCommand = new RelayCommand(async _ => await StartUpdate(), _ => CanStartUpdate());
+            StartUpdateCommand = new RelayCommand(async _ => await StartUpdate(), _ => Clusters.SelectMany(c => c.Servers).Any(s => s.IsInstalled && s.IsUpdateAvailable));
+
+            // Subscribe to the logging service event
+            LoggingService.OnNewLogEntry += OnNewLogEntry;
 
             InitializationTask = InitializeApplication();
+        }
+
+        private void OnNewLogEntry(LogLevel level)
+        {
+            if (level == LogLevel.Error || level == LogLevel.Warning)
+            {
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    HasNewErrorLogs = true;
+                });
+            }
         }
 
         private async Task<bool> InitializeApplication()

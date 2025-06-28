@@ -54,6 +54,8 @@ namespace BDSM
         public bool IsActive => _serverConfig.Active;
         public bool IsInstalled { get; private set; }
 
+        public bool UseApiLoader => _serverConfig.UseApiLoader;
+
         public Guid ServerId => _serverConfig.Id;
         public Process? ServerProcess => _serverProcess;
 
@@ -126,11 +128,12 @@ namespace BDSM
                     case "Running": return Brushes.LawnGreen;
                     case "Starting": return Brushes.Yellow;
                     case "Stopped": return Brushes.Red;
-                    case "Stopping": return Brushes.OrangeRed;
+                    case "Stopping": return Brushes.OrangeRed; // This color is fine to keep
                     case "Update Pending": return Brushes.Orange;
                     case "Shutting Down": return Brushes.DarkOrange;
                     case "Updating": return Brushes.DodgerBlue;
                     case "Not Installed": return Brushes.SlateGray;
+                    case "Error": return Brushes.HotPink; // Added for the new Error status
                     default: return Brushes.Gray;
                 }
             }
@@ -147,7 +150,7 @@ namespace BDSM
             IsInstalled = File.Exists(keyFilePath);
 
             ShowGraphDetailCommand = new RelayCommand(_ => ShowGraphDetail());
-            StartServerCommand = new RelayCommand(_ => StartServer(), _ => (Status == "Stopped" || Status == "Not Installed") && !TaskSchedulerService.IsMajorOperationInProgress && IsInstalled);
+            StartServerCommand = new RelayCommand(_ => StartServer(), _ => (Status == "Stopped" || Status == "Not Installed" || Status == "Error") && !TaskSchedulerService.IsMajorOperationInProgress && IsInstalled);
             StopServerCommand = new RelayCommand(async _ => await UpdateManager.PerformMaintenanceShutdownAsync(new List<ServerViewModel> { this }, _globalConfig), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
             RestartServerCommand = new RelayCommand(async _ => await UpdateManager.PerformScheduledRebootAsync(new List<ServerViewModel> { this }, _globalConfig), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
             EmergencyStopCommand = new RelayCommand(async _ => await EmergencyStopServer(), _ => Status == "Running" && !TaskSchedulerService.IsMajorOperationInProgress);
@@ -247,7 +250,7 @@ namespace BDSM
 
         public void StartServer()
         {
-            if (Status != "Stopped" && Status != "Not Installed") return;
+            if (Status != "Stopped" && Status != "Not Installed" && Status != "Error") return;
             Status = "Starting";
             var mods = _serverConfig.IsClubArk ? _serverConfig.MapSpecificMods : _clusterConfig.MainModList.Union(_serverConfig.MapSpecificMods).ToList();
             string modArgument = mods.Any() ? $"-mods={string.Join(",", mods)}" : "";
@@ -256,8 +259,10 @@ namespace BDSM
             string executablePath = Path.Combine(_serverConfig.InstallDir, "ShooterGame", "Binaries", "Win64", executableName);
             if (!File.Exists(executablePath))
             {
-                MessageBox.Show($"Error: The required server executable was not found:\n\n{executablePath}\n\nPlease ensure the server and/or API is installed correctly.", "Executable Not Found", MessageBoxButton.OK, MessageBoxImage.Error);
-                Status = "Stopped";
+                string errorMsg = $"Error starting {ServerName}: The required server executable was not found at {executablePath}";
+                LoggingService.Log(errorMsg, LogLevel.Error);
+                NotificationService.ShowInfo($"Executable not found for {ServerName}. See Event Log.");
+                Status = "Error";
                 return;
             }
             try
@@ -324,7 +329,10 @@ namespace BDSM
 
         public async Task UpdateServerStatus()
         {
-            if (Status == "Shutting Down" || Status == "Stopping" || Status == "Update Pending" || Status == "Updating" || !IsInstalled) return;
+            // --- THIS IS THE FIX ---
+            // Removed "Stopping" from this condition to allow the monitor to detect when an E-stopped server has closed.
+            if (Status == "Shutting Down" || Status == "Update Pending" || Status == "Updating" || !IsInstalled) return;
+
             var processName = "ArkAscendedServer";
             var allProcesses = Process.GetProcessesByName(processName);
             Process? serverProcess = allProcesses.FirstOrDefault(p => IsCorrectServerProcess(p));

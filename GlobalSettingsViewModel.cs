@@ -82,6 +82,19 @@ namespace BDSM
             set { _config.UpdateCheckIntervalMinutes = value; OnPropertyChanged(); }
         }
 
+        public int ShutdownTimeoutSeconds
+        {
+            get => _config.ShutdownTimeoutSeconds;
+            set { _config.ShutdownTimeoutSeconds = value; OnPropertyChanged(); }
+        }
+
+        // --- NEW PROPERTY ---
+        public int SteamCmdTimeoutMinutes
+        {
+            get => _config.SteamCmdTimeoutMinutes;
+            set { _config.SteamCmdTimeoutMinutes = value; OnPropertyChanged(); }
+        }
+
         public ICommand SaveGlobalSettingsCommand { get; }
         public ICommand BrowseSteamCMDCommand { get; }
         public ICommand BrowseBackupsPathCommand { get; }

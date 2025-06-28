@@ -26,11 +26,12 @@ namespace BDSM
         [JsonProperty("backupIntervalMinutes")]
         public int BackupIntervalMinutes { get; set; } = 30;
 
-        [JsonProperty("backupRetryIntervalMinutes")]
-        public int BackupRetryIntervalMinutes { get; set; } = 5;
-
         [JsonProperty("updateCheckIntervalMinutes")]
         public int UpdateCheckIntervalMinutes { get; set; } = 15;
+
+        // --- NEW PROPERTY ---
+        [JsonProperty("steamCmdTimeoutMinutes")]
+        public int SteamCmdTimeoutMinutes { get; set; } = 30;
 
         [JsonProperty("mcrconPath")]
         public string McRconPath { get; set; } = string.Empty;
@@ -63,6 +64,6 @@ namespace BDSM
         public string WatchdogDiscordWebhookUrl { get; set; } = string.Empty;
 
         [JsonProperty("shutdownTimeoutSeconds")]
-        public int ShutdownTimeoutSeconds { get; set; } = 120;
+        public int ShutdownTimeoutSeconds { get; set; } = 180;
     }
 }

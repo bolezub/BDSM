@@ -67,7 +67,7 @@
                 </Grid>
             </Border>
 
-            <TextBlock Text="Scheduling Intervals" Style="{StaticResource SectionHeaderStyle}"/>
+            <TextBlock Text="Scheduling Intervals &amp; Timeouts" Style="{StaticResource SectionHeaderStyle}"/>
             <Border Style="{StaticResource CardBorderStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -77,6 +77,8 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Backup Interval (Minutes):" Margin="0,5,10,5"/>
@@ -84,6 +86,12 @@
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Update Check Interval (Minutes):" Margin="0,5,10,5"/>
                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding UpdateCheckIntervalMinutes, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Shutdown Timeout (Seconds):" Margin="0,5,10,5" ToolTip="How long to wait for a server to shut down gracefully before forcing it to close."/>
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ShutdownTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="SteamCMD Timeout (Minutes):" Margin="0,5,10,5" ToolTip="How long to wait for a SteamCMD update to finish before aborting it."/>
+                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SteamCmdTimeoutMinutes, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
                 </Grid>
             </Border>
 

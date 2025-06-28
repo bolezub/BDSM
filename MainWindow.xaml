@@ -39,6 +39,9 @@
         <DataTemplate DataType="{x:Type local:WatchdogViewModel}">
             <local:WatchdogView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type local:EventLogViewModel}">
+            <local:EventLogView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type local:ApplicationViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" 
                           Style="{StaticResource ModernScrollViewer}">
@@ -81,32 +84,41 @@
             </ScrollViewer>
         </DataTemplate>
 
-        <Style x:Key="MainMenuButton" TargetType="RadioButton">
+        <Style x:Key="BaseMenuButtonStyle" TargetType="RadioButton">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#CCCCCC"/>
-            <Setter Property="Padding" Value="10, 12"/>
-            <Setter Property="Margin" Value="15, 5"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="20, 12, 10, 12"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Background" Value="#2A2347" />
+                    <Setter Property="BorderBrush" Value="{Binding Path=Foreground, RelativeSource={RelativeSource Self}}" />
+                </Trigger>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="#3B345E"/>
-                    <Setter Property="Foreground" Value="White"/>
                 </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="EventLogMenuButton" TargetType="RadioButton" BasedOn="{StaticResource BaseMenuButtonStyle}">
+            <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Background" Value="#2A2347" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -172,49 +184,141 @@
 
                 <Image Source="/Assets/logo.png" Width="200" Height="200" Margin="0,0,0,0" Stretch="Uniform"/>
 
-                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowDashboardCommand}" IsChecked="True" GroupName="MainMenu">
+                <RadioButton Style="{StaticResource BaseMenuButtonStyle}" Foreground="#FF5C99D6" Command="{Binding ShowDashboardCommand}" IsChecked="True" GroupName="MainMenu" HorizontalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="ViewDashboard" Margin="0,0,15,0" Width="20" Height="20"/>
-                        <TextBlock Text="Dashboard" FontSize="14"/>
+                        <materialDesign:PackIcon x:Name="DashboardIcon" Kind="ViewDashboard" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Dashboard" FontSize="14">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#B39DDB"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True">
+                                            <Setter Property="Foreground" Value="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </RadioButton>
-                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowClustersCommand}" GroupName="MainMenu">
+
+                <RadioButton Style="{StaticResource BaseMenuButtonStyle}" Foreground="#FF8A5FD4" Command="{Binding ShowClustersCommand}" GroupName="MainMenu" HorizontalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="ServerNetwork" Margin="0,0,15,0" Width="20" Height="20"/>
-                        <TextBlock Text="Clusters" FontSize="14"/>
+                        <materialDesign:PackIcon x:Name="ClustersIcon" Kind="ServerNetwork" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Clusters" FontSize="14">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#B39DDB"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True">
+                                            <Setter Property="Foreground" Value="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </RadioButton>
-                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowWatchdogCommand}" GroupName="MainMenu">
+
+                <RadioButton Style="{StaticResource BaseMenuButtonStyle}" Foreground="#FF4ADBC3" Command="{Binding ShowWatchdogCommand}" GroupName="MainMenu" HorizontalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Eye" Margin="0,0,15,0" Width="20" Height="20"/>
-                        <TextBlock Text="Watchdog" FontSize="14"/>
+                        <materialDesign:PackIcon x:Name="WatchdogIcon" Kind="Eye" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Watchdog" FontSize="14">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#B39DDB"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True">
+                                            <Setter Property="Foreground" Value="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </RadioButton>
-                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowSchedulesCommand}" GroupName="MainMenu">
+
+                <RadioButton Style="{StaticResource BaseMenuButtonStyle}" Foreground="#FF58D68D" Command="{Binding ShowSchedulesCommand}" GroupName="MainMenu" HorizontalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="ClockOutline" Margin="0,0,15,0" Width="20" Height="20"/>
-                        <TextBlock Text="Schedules" FontSize="14"/>
+                        <materialDesign:PackIcon x:Name="SchedulesIcon" Kind="ClockOutline" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Schedules" FontSize="14">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#B39DDB"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True">
+                                            <Setter Property="Foreground" Value="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </RadioButton>
-                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowBackupsCommand}" GroupName="MainMenu">
+
+                <RadioButton Style="{StaticResource BaseMenuButtonStyle}" Foreground="#FFF39C12" Command="{Binding ShowBackupsCommand}" GroupName="MainMenu" HorizontalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="DatabaseSyncOutline" Margin="0,0,15,0" Width="20" Height="20"/>
-                        <TextBlock Text="Backups" FontSize="14"/>
+                        <materialDesign:PackIcon x:Name="BackupsIcon" Kind="DatabaseSyncOutline" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Backups" FontSize="14">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#B39DDB"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True">
+                                            <Setter Property="Foreground" Value="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </RadioButton>
-                <RadioButton Style="{StaticResource MainMenuButton}" Command="{Binding ShowGlobalSettingsCommand}" GroupName="MainMenu">
+
+                <RadioButton Style="{StaticResource BaseMenuButtonStyle}" Foreground="#FFD959A6" Command="{Binding ShowGlobalSettingsCommand}" GroupName="MainMenu" HorizontalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="CogBox" Margin="0,0,15,0" Width="20" Height="20"/>
-                        <TextBlock Text="Global Settings" FontSize="14"/>
+                        <materialDesign:PackIcon x:Name="SettingsIcon" Kind="CogBox" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Global Settings" FontSize="14">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#B39DDB"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True">
+                                            <Setter Property="Foreground" Value="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </RadioButton>
+
+                <RadioButton Style="{StaticResource EventLogMenuButton}" Foreground="#F44336" Command="{Binding ShowEventLogCommand}" GroupName="MainMenu" HorizontalAlignment="Stretch">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon x:Name="EventLogIcon" Kind="AlertCircleOutline" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Margin="0,0,15,0" Width="20" Height="20"/>
+                        <TextBlock Text="Event Log" FontSize="14">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#B39DDB"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True">
+                                            <Setter Property="Foreground" Value="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <materialDesign:PackIcon Kind="Circle" Foreground="Red" Width="8" Height="8" VerticalAlignment="Top" Margin="5,0,0,0"
+                                                 Visibility="{Binding DataContext.HasNewErrorLogs, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
+                </RadioButton>
+
             </StackPanel>
 
             <ContentControl Grid.Row="1" Grid.Column="1" Content="{Binding CurrentView}"/>
 
             <local:StatusBarView Grid.Row="2" Grid.Column="1" DataContext="{Binding StatusBar}"/>
 
-            <materialDesign:Snackbar Grid.Row="1" Grid.Column="1" x:Name="MainSnackbar" MessageQueue="{materialDesign:MessageQueue}" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="0,0,0,10"/>
+            <materialDesign:Snackbar Grid.Row="1" Grid.Column="1" x:Name="MainSnackbar" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="0,0,0,10"/>
 
         </Grid>
     </Border>
