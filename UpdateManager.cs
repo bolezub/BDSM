@@ -271,7 +271,26 @@ namespace BDSM
         public static async Task RunSteamCmdUpdateForServerAsync(ServerViewModel server, GlobalConfig config)
         {
             server.Status = "Updating";
-            await SendDiscordMessageAsync(config, server, "Server files are being verified/repaired via SteamCMD...");
+            await SendDiscordMessageAsync(config, server, "Server files are being updated/repaired via SteamCMD...");
+
+            // --- NEW LOGIC: Clear the .acf manifest file to force an update ---
+            try
+            {
+                // Construct the path to the appmanifest file.
+                string manifestPath = Path.Combine(server.InstallDir, "steamapps", $"appmanifest_{config.AppId}.acf");
+                if (File.Exists(manifestPath))
+                {
+                    // By writing an empty string, we corrupt the manifest, forcing SteamCMD to
+                    // re-validate and download the latest version from scratch.
+                    await File.WriteAllTextAsync(manifestPath, string.Empty);
+                    LoggingService.Log($"Cleared manifest file for {server.ServerName} to force update.", LogLevel.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Log($"Could not clear manifest file for {server.ServerName}. Proceeding anyway. Error: {ex.Message}", LogLevel.Warning);
+            }
+            // --- END OF NEW LOGIC ---
 
             string steamCmdArgs = $"+login anonymous +force_install_dir \"{server.InstallDir}\" +app_update {config.AppId} validate +quit";
             var processStartInfo = new ProcessStartInfo
@@ -302,7 +321,6 @@ namespace BDSM
                 }
             }
         }
-
         public static async Task<UpdateCheckResult> CheckForUpdateAsync(string installDir, string appId, string apiUrl)
         {
             var result = new UpdateCheckResult();

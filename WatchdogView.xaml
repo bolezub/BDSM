@@ -42,11 +42,16 @@
                     <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding TimeUntilNextGraphPost}" Foreground="Gold" FontWeight="SemiBold" Margin="20,0,0,0"/>
                 </Grid>
             </Border>
-
             <Button Content="Save Watchdog Settings"
                     Command="{Binding SaveWatchdogSettingsCommand}"
                     HorizontalAlignment="Left"
                     Margin="0,30,0,0"/>
+            <Button Content="Open Discord Debugger"
+                    Command="{Binding OpenDebugWindowCommand}"
+                    HorizontalAlignment="Left"
+                    Background="DarkGoldenrod"
+                    Margin="0,20,0,0"
+                    ToolTip="Opens a tool to fetch and test deletion of messages in the watchdog channel."/>
 
         </StackPanel>
     </ScrollViewer>

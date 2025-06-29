@@ -46,10 +46,22 @@ namespace BDSM
 
         public ICommand SaveWatchdogSettingsCommand { get; }
 
+        // --- NEW COMMAND ---
+        public ICommand OpenDebugWindowCommand { get; }
+
         public WatchdogViewModel(GlobalConfig globalConfig)
         {
             _config = globalConfig;
             SaveWatchdogSettingsCommand = new RelayCommand(_ => SaveSettings());
+
+            // --- NEW COMMAND INITIALIZATION ---
+            OpenDebugWindowCommand = new RelayCommand(_ => {
+                var debugWindow = new DiscordDebugWindow
+                {
+                    DataContext = new DiscordDebugViewModel(_config)
+                };
+                debugWindow.Show();
+            });
 
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _timer.Tick += Timer_Tick;
@@ -85,7 +97,6 @@ namespace BDSM
                 string updatedJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
                 File.WriteAllText("config.json", updatedJson);
 
-                // NEW: Restart the timer with the new values
                 WatchdogService.RestartTimer();
 
                 NotificationService.ShowInfo("Watchdog settings saved and applied immediately.");
