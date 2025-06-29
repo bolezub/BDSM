@@ -12,41 +12,32 @@ namespace BDSM
         private static DiscordSocketClient? _client;
         private static CommandService? _commands;
         private static IServiceProvider? _services;
-        private static GlobalConfig? _config;
 
         public static async Task StartAsync(GlobalConfig config, IServiceProvider services)
         {
-            _config = config;
             _services = services;
 
-            if (string.IsNullOrWhiteSpace(_config.BotToken))
-            {
-                return;
-            }
+            if (string.IsNullOrWhiteSpace(config.BotToken)) return;
 
             _client = new DiscordSocketClient(new DiscordSocketConfig
             {
-                GatewayIntents = GatewayIntents.Guilds |
-                                 GatewayIntents.GuildMessages |
-                                 GatewayIntents.MessageContent |
-                                 GatewayIntents.GuildMembers
+                GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.MessageContent | GatewayIntents.GuildMembers
             });
 
             _commands = new CommandService();
 
             _client.Log += Log;
-            _client.Ready += OnReady;
 
             try
             {
+                await _client.LoginAsync(TokenType.Bot, config.BotToken);
+                await _client.StartAsync();
                 _client.MessageReceived += HandleCommandAsync;
                 await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
-                await _client.LoginAsync(TokenType.Bot, _config.BotToken);
-                await _client.StartAsync();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Error logging removed
+                LoggingService.Log($"Discord Bot Error: {ex.Message}", LogLevel.Error);
             }
         }
 
@@ -59,13 +50,9 @@ namespace BDSM
             await _commands.ExecuteAsync(context: context, argPos: argPos, services: _services);
         }
 
-        private static Task OnReady()
-        {
-            return Task.CompletedTask;
-        }
-
         private static Task Log(LogMessage msg)
         {
+            // You can add logging here if you wish, but for now it's clean.
             return Task.CompletedTask;
         }
     }

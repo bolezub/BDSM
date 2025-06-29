@@ -32,48 +32,77 @@ namespace BDSM
             }
             TaskSchedulerService.SetOperationLock();
 
+            var steamCmdSemaphore = new SemaphoreSlim(1, 1);
+
             try
             {
-                var shutdownTasks = new List<Task>();
-                var serversToRestartLater = new HashSet<Guid>();
+                var updatePipelineTasks = new List<Task>();
 
                 foreach (var server in allServersToUpdate)
                 {
-                    if (server.Status == "Running" || server.Status == "Starting")
+                    var pipelineTask = Task.Run(async () =>
                     {
-                        serversToRestartLater.Add(server.ServerId);
-                    }
+                        // Capture the server's state BEFORE the update process begins
+                        bool shouldRestart = server.Status == "Running" || server.Status == "Starting";
 
-                    if (server.Status == "Running")
-                    {
-                        shutdownTasks.Add(GracefulShutdownAsync(new List<ServerViewModel> { server }, config, "update", false));
-                    }
-                    else if (server.Status == "Starting")
-                    {
-                        shutdownTasks.Add(server.KillProcessAsync(force: true));
-                    }
-                }
+                        // Part 1: Shutdown
+                        if (server.Status == "Running")
+                        {
+                            await GracefulShutdownAsync(new List<ServerViewModel> { server }, config, "update", false);
+                        }
+                        else if (server.Status == "Starting")
+                        {
+                            await server.KillProcessAsync(force: true);
+                        }
 
-                if (shutdownTasks.Any())
-                {
-                    await Task.WhenAll(shutdownTasks);
-                }
+                        // Part 2: Final Process Verification
+                        bool processIsGone = await EnsureProcessHasExited(server);
+                        if (!processIsGone)
+                        {
+                            string errorMsg = $"CRITICAL: Update for {server.ServerName} aborted. The process did not exit after shutdown command.";
+                            LoggingService.Log(errorMsg, LogLevel.Error);
+                            NotificationService.ShowInfo(errorMsg);
+                            server.Status = "Error";
+                            return;
+                        }
 
-                foreach (var server in allServersToUpdate)
-                {
-                    await RunSteamCmdUpdateForServerAsync(server, config);
+                        // Part 3: Enter the Update Queue and Execute
+                        await steamCmdSemaphore.WaitAsync();
+                        try
+                        {
+                            await RunSteamCmdUpdateForServerAsync(server, config);
+                        }
+                        finally
+                        {
+                            steamCmdSemaphore.Release();
+                        }
 
-                    if (server.Status != "Error")
-                    {
+                        // If SteamCMD itself reported an error, abort here.
+                        if (server.Status == "Error")
+                        {
+                            return;
+                        }
+
+                        // --- Part 4: Post-Update Finalization (THE FIX) ---
+                        // 1. Set status to Stopped to indicate the update operation is complete.
                         server.Status = "Stopped";
 
-                        if (serversToRestartLater.Contains(server.ServerId))
+                        // 2. Re-check the server version to refresh the UI and remove the update icon.
+                        await server.CheckForUpdate();
+
+                        // --- Part 5: Restart (if needed) ---
+                        // This will now work because the preconditions (Status is "Stopped") are met.
+                        if (shouldRestart)
                         {
                             await SendDiscordMessageAsync(config, server, "Update complete. Server is restarting...");
                             server.StartServer();
                         }
-                    }
+                    });
+
+                    updatePipelineTasks.Add(pipelineTask);
                 }
+
+                await Task.WhenAll(updatePipelineTasks);
             }
             finally
             {
@@ -81,12 +110,29 @@ namespace BDSM
             }
         }
 
+        private static async Task<bool> EnsureProcessHasExited(ServerViewModel server)
+        {
+            int checks = 0;
+            while (checks < 10)
+            {
+                var process = Process.GetProcessesByName("ArkAscendedServer")
+                                     .FirstOrDefault(p => {
+                                         try { return p.MainModule?.FileName.StartsWith(server.InstallDir, StringComparison.OrdinalIgnoreCase) ?? false; }
+                                         catch { return false; }
+                                     });
+                if (process == null)
+                {
+                    return true;
+                }
+                await Task.Delay(1000);
+                checks++;
+            }
+            return false;
+        }
+
         public static async Task PerformSimpleRebootAsync(List<ServerViewModel> activeServers, GlobalConfig config)
         {
-            if (TaskSchedulerService.IsMajorOperationInProgress)
-            {
-                return;
-            }
+            if (TaskSchedulerService.IsMajorOperationInProgress) return;
             TaskSchedulerService.SetOperationLock();
             try
             {
@@ -131,20 +177,14 @@ namespace BDSM
 
         public static async Task PerformMaintenanceShutdownAsync(List<ServerViewModel> activeServers, GlobalConfig config)
         {
-            if (TaskSchedulerService.IsMajorOperationInProgress)
-            {
-                return;
-            }
+            if (TaskSchedulerService.IsMajorOperationInProgress) return;
             TaskSchedulerService.SetOperationLock();
             try
             {
-                var shutdownTasks = activeServers
-                    .Where(s => s.Status == "Running")
-                    .ToList();
-
-                if (shutdownTasks.Any())
+                var runningServers = activeServers.Where(s => s.Status == "Running").ToList();
+                if (runningServers.Any())
                 {
-                    await GracefulShutdownAsync(shutdownTasks, config, "maintenance", false);
+                    await GracefulShutdownAsync(runningServers, config, "maintenance", false);
                 }
             }
             finally
@@ -155,44 +195,19 @@ namespace BDSM
 
         public static async Task PerformScheduledRebootAsync(List<ServerViewModel> activeServers, GlobalConfig config)
         {
-            if (TaskSchedulerService.IsMajorOperationInProgress)
-            {
-                return;
-            }
+            if (TaskSchedulerService.IsMajorOperationInProgress) return;
             TaskSchedulerService.SetOperationLock();
-
             try
             {
-                foreach (var server in activeServers)
-                {
-                    await server.CheckForUpdate();
-                }
+                await Task.WhenAll(activeServers.Select(s => s.CheckForUpdate()));
 
-                var shutdownTasks = new List<Task>();
-                foreach (var server in activeServers.Where(s => s.Status == "Running"))
-                {
-                    shutdownTasks.Add(GracefulShutdownAsync(new List<ServerViewModel> { server }, config, "restart", false));
-                }
+                var serversToUpdate = activeServers.Where(s => s.IsUpdateAvailable).ToList();
+                var serversToReboot = activeServers.Where(s => !s.IsUpdateAvailable).ToList();
 
-                if (shutdownTasks.Any())
-                {
-                    await Task.WhenAll(shutdownTasks);
-                }
+                var updateTask = serversToUpdate.Any() ? PerformUpdateProcessAsync(serversToUpdate, config) : Task.CompletedTask;
+                var rebootTask = serversToReboot.Any() ? PerformSimpleRebootAsync(serversToReboot, config) : Task.CompletedTask;
 
-                foreach (var server in activeServers)
-                {
-                    if (server.IsUpdateAvailable)
-                    {
-                        await RunSteamCmdUpdateForServerAsync(server, config);
-                    }
-
-                    if (server.Status != "Error")
-                    {
-                        server.Status = "Stopped";
-                        await SendDiscordMessageAsync(config, server, "Server is restarting...");
-                        server.StartServer();
-                    }
-                }
+                await Task.WhenAll(updateTask, rebootTask);
             }
             finally
             {
@@ -211,27 +226,8 @@ namespace BDSM
                 await SendDiscordMessageAsync(config, server, initialMsg);
             }
 
-            int totalCountdown = 900;
-            while (totalCountdown > 0)
-            {
-                if (!servers.Any(s => s.CurrentPlayers > 0))
-                {
-                    break;
-                }
-
-                var warningTimes = new Dictionary<int, string> { { 600, "10 minutes" }, { 300, "5 minutes" }, { 60, "1 minute" } };
-                if (warningTimes.ContainsKey(totalCountdown))
-                {
-                    string message = $"All servers {reason} in {warningTimes[totalCountdown]}.";
-                    foreach (var server in servers)
-                    {
-                        await server.SendRconCommandAsync($"ServerChat {message}");
-                        await SendDiscordMessageAsync(config, server, message);
-                    }
-                }
-                await Task.Delay(10000);
-                totalCountdown -= 10;
-            }
+            var serverCheckTasks = servers.Select(s => WaitForServerEmptyOrTimeout(s, config.ShutdownTimeoutSeconds)).ToList();
+            await Task.WhenAll(serverCheckTasks);
 
             foreach (var server in servers)
             {
@@ -242,13 +238,16 @@ namespace BDSM
                 await server.SendRconCommandAsync("DoExit");
             }
 
-            var shutdownTasks = servers.Select(s => WaitForExit(s, config)).ToList();
-            await Task.WhenAll(shutdownTasks);
+            await Task.WhenAll(servers.Select(s => WaitForExit(s, config)));
+        }
 
-            if (runUpdateAfter)
+        private static async Task WaitForServerEmptyOrTimeout(ServerViewModel server, int timeoutSeconds)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            while (stopwatch.Elapsed.TotalSeconds < timeoutSeconds)
             {
-                var updateTasks = servers.Select(s => RunSteamCmdUpdateForServerAsync(s, config)).ToList();
-                await Task.WhenAll(updateTasks);
+                if (server.CurrentPlayers == 0) break;
+                await Task.Delay(10000);
             }
         }
 
@@ -265,51 +264,15 @@ namespace BDSM
                 await Task.Delay(1000);
             }
             stopwatch.Stop();
-
             await server.KillProcessAsync(force: true);
             server.Status = "Stopped";
         }
 
         public static async Task RunSteamCmdUpdateForServerAsync(ServerViewModel server, GlobalConfig config)
         {
-            var processName = "ArkAscendedServer";
-            var runningProcesses = Process.GetProcessesByName(processName);
-            string serverExePath = Path.Combine(server.InstallDir, "ShooterGame", "Binaries", "Win64");
-
-            foreach (var runningProcess in runningProcesses)
-            {
-                try
-                {
-                    if (runningProcess.MainModule != null && Path.GetDirectoryName(runningProcess.MainModule.FileName).Equals(serverExePath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        string criticalError = $"CRITICAL ERROR: Update for {server.ServerName} aborted. The server process was detected as still running during the update phase. Manifest file was NOT touched.";
-                        LoggingService.Log(criticalError, LogLevel.Error);
-                        NotificationService.ShowInfo($"Update for {server.ServerName} aborted. See Event Log.");
-                        await SendDiscordMessageAsync(config, server, criticalError);
-                        server.Status = "Error";
-                        return;
-                    }
-                }
-                catch
-                {
-                    // Ignore processes we can't access
-                }
-            }
-
             server.Status = "Updating";
             await SendDiscordMessageAsync(config, server, "Server files are being verified/repaired via SteamCMD...");
-            string manifestPath = Path.Combine(server.InstallDir, "steamapps", $"appmanifest_{config.AppId}.acf");
-            if (File.Exists(manifestPath))
-            {
-                try
-                {
-                    await File.WriteAllTextAsync(manifestPath, "");
-                }
-                catch (Exception)
-                {
-                    // Error logging removed
-                }
-            }
+
             string steamCmdArgs = $"+login anonymous +force_install_dir \"{server.InstallDir}\" +app_update {config.AppId} validate +quit";
             var processStartInfo = new ProcessStartInfo
             {
@@ -324,18 +287,13 @@ namespace BDSM
             {
                 try
                 {
-                    // Ensure a minimum timeout of 5 minutes.
                     var timeoutMinutes = Math.Max(5, config.SteamCmdTimeoutMinutes);
-                    using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes)))
-                    {
-                        await process.WaitForExitAsync(cts.Token);
-                    }
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes));
+                    await process.WaitForExitAsync(cts.Token);
                 }
                 catch (OperationCanceledException)
                 {
-                    // This block executes if the timeout is reached.
-                    try { process.Kill(true); } catch { /* Ignore errors trying to kill */ }
-
+                    try { process.Kill(true); } catch { /* Ignore */ }
                     string timeoutError = $"ERROR: SteamCMD update for {server.ServerName} timed out after {config.SteamCmdTimeoutMinutes} minutes and was aborted.";
                     LoggingService.Log(timeoutError, LogLevel.Error);
                     NotificationService.ShowInfo($"Update for {server.ServerName} timed out. See Event Log.");
@@ -364,7 +322,6 @@ namespace BDSM
                 result.LatestBuild = canTrustLatestVersion ? latestBuild : "API Error";
                 result.IsUpdateAvailable = false;
             }
-
             return result;
         }
 
@@ -395,7 +352,7 @@ namespace BDSM
             }
             catch (Exception)
             {
-                return null;
+                return "Error";
             }
         }
 

@@ -172,17 +172,15 @@ namespace BDSM
                 var versionCheckTasks = allServers.Select(server => server.CheckForUpdate()).ToList();
                 await Task.WhenAll(versionCheckTasks);
 
+                // Original, simple service startup
                 DataLogger.InitializeDatabase(_config.BackupPath);
-
                 TaskSchedulerService.ClearLastRunHistory();
-
                 TaskSchedulerService.Start(_config, this);
                 TaskSchedulerService.PreventMissedTasksOnStartup();
-
                 BackupSchedulerService.Start(_config, this);
                 UpdateSchedulerService.Start(_config, this);
-                await WatchdogService.InitializeAndStart(_config, this);
-                await DiscordBotService.StartAsync(_config, _services);
+                _ = WatchdogService.InitializeAndStart(_config, this);
+                _ = DiscordBotService.StartAsync(_config, _services);
 
                 await UpdateLatestBuildIdAsync();
             }
@@ -192,7 +190,6 @@ namespace BDSM
 
             return isFirstRun;
         }
-
         public async Task CheckAllServersForUpdate()
         {
             var allServers = Clusters.SelectMany(c => c.Servers).Where(s => s.IsInstalled);
