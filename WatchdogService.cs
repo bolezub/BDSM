@@ -32,7 +32,6 @@ namespace BDSM
                 return;
             }
 
-            // Original startup logic: Delete the last known messages
             await DeleteOldMessage(isGraphMessage: false);
             await DeleteOldMessage(isGraphMessage: true);
 
@@ -105,6 +104,25 @@ namespace BDSM
             sb.AppendLine("```");
             foreach (var line in statusLines) sb.AppendLine(line);
             sb.AppendLine("```");
+
+            // --- NEW: Add the player list section ---
+            sb.AppendLine("```"); // Start a new code block for the player list
+            foreach (var server in servers)
+            {
+                string playerListString;
+                if (server.OnlinePlayers.Any())
+                {
+                    playerListString = string.Join(", ", server.OnlinePlayers);
+                }
+                else
+                {
+                    playerListString = "no players connected";
+                }
+                sb.AppendLine($"{server.ServerName}: {playerListString}");
+            }
+            sb.AppendLine("```");
+            // --- END of new section ---
+
             await UpdateDiscordMessageAsync(sb.ToString(), isGraphMessage: false);
         }
 
@@ -147,7 +165,7 @@ namespace BDSM
                     }
                     else return;
                 }
-                catch (Exception ex) { LoggingService.Log($"Failed to edit webhook message {messageId}: {ex.Message}", LogLevel.Warning); return; }
+                catch (Exception ex) { LoggingService.Log($"Failed to edit webhook message {messageId}: {ex.Message}", LogLevel.Error); return; }
             }
             try
             {

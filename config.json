@@ -157,6 +157,23 @@
           "memoryThresholdGB": 45,
           "active": false,
           "hidden": true
+        },
+        {
+          "id": "0eeab3ed-7ce1-4510-9912-c7728094630d",
+          "name": "Test Server",
+          "sessionName": "Test",
+          "isClubArk": false,
+          "useApiLoader": false,
+          "installDir": "D:\\Servers\\test",
+          "mapFolder": "TheIsland_WP",
+          "port": 1560,
+          "queryPort": 15060,
+          "rconPort": 15160,
+          "mapSpecificMods": [],
+          "discordNotificationsEnabled": false,
+          "memoryThresholdGB": 35,
+          "active": true,
+          "hidden": false
         }
       ]
     }
@@ -195,7 +212,7 @@
     "isEnabled": true,
     "scanIntervalSeconds": 30,
     "graphPostIntervalMinutes": 2,
-    "textMessageId": "1387761645320798382",
+    "textMessageId": "",
     "graphMessageId": "1387764490375921665"
   },
   "gameUserSettingsTemplatePath": "D:\\Servers\\Templates\\GameUserSettings.ini",
@@ -210,8 +227,8 @@
   ],
   "botToken": "MTM4NDg0NzE0MDY1NTk5Mjg4Mg.GoPToN.7f06acleRD4N14DEjL_T9htSsN5fiVFmrFf83A",
   "backupIntervalMinutes": 20,
-  "backupRetryIntervalMinutes": 3,
   "updateCheckIntervalMinutes": 30,
+  "steamCmdTimeoutMinutes": 30,
   "mcrconPath": "",
   "steamCMDPath": "D:\\SteamCMD\\steamcmd.exe",
   "backupPath": "D:\\Backups\\",
@@ -221,6 +238,6 @@
   "appId": "2430930",
   "steamApiUrl": "https://api.steamcmd.net/v1/info/2430930",
   "discordWebhookUrl": "https://discord.com/api/webhooks/1250776509204008960/gSza2zLAiZj58IHqG5A_UifkkH10VARM5u96rtA7jU5Om2latyDPxAtzjMKJBHcR-ty-",
-  "watchdogDiscordWebhookUrl": "https://discord.com/api/webhooks/1369599696770961478/8qcsdNFhnoy-BcvoI3CzrbmgLjiJQP1Lub3MCjJKxo6_e6iYe50uE1D38JDRNhvMrdFm",
+  "watchdogDiscordWebhookUrl": "https://discord.com/api/webhooks/1388962479182446663/HvA4dkm--vNMJInaKkPbIBjY62dkzT2j1ngbDy16saEh4Ph1VnOSnzESsdxx8SBqgK2A",
   "shutdownTimeoutSeconds": 180
 }
