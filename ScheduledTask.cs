@@ -45,17 +45,19 @@ namespace BDSM
             get
             {
                 if (!IsEnabled) return null;
+
                 var now = DateTime.Now;
 
-                // Search the next 14 days to find the very next future run time.
+                // Search for the next 14 days to be absolutely sure we find the next valid run time.
                 for (int i = 0; i < 14; i++)
                 {
-                    var checkDate = DateTime.Today.AddDays(i);
+                    var checkDate = now.Date.AddDays(i);
                     if (IsScheduledForDay(checkDate.DayOfWeek))
                     {
                         var potentialRunTime = checkDate.Date + ScheduledTime;
 
-                        // If this potential time is in the future, we've found our match.
+                        // If the potential time is in the future, it's a valid candidate.
+                        // The first one we find will be the soonest.
                         if (potentialRunTime > now)
                         {
                             return potentialRunTime;
@@ -63,7 +65,7 @@ namespace BDSM
                     }
                 }
 
-                // If no run time is found in the next 14 days (e.g., no days are checked), return null.
+                // If no days are checked at all, or no future time is found, return null.
                 return null;
             }
         }

@@ -54,7 +54,7 @@ namespace BDSM
                 {
                     _liveSelectedServer = _appViewModel.Clusters
                         .SelectMany(c => c.Servers)
-                        .FirstOrDefault(svm => svm.ServerName == _selectedServer.Name.Replace("ASA ", ""));
+                        .FirstOrDefault(svm => svm.ServerId == _selectedServer.Id);
 
                     if (_liveSelectedServer != null)
                     {
@@ -117,7 +117,6 @@ namespace BDSM
 
         public ObservableCollection<ServerConfig> ServersInSelectedCluster { get; set; }
 
-        #region Proxy Properties for Mod Lists
         public string SelectedClusterMainModList
         {
             get => SelectedCluster != null ? string.Join(",", SelectedCluster.MainModList) : "";
@@ -162,7 +161,6 @@ namespace BDSM
                 }
             }
         }
-        #endregion
 
         public List<string> AvailableMaps => _config.AvailableMaps;
 
@@ -182,6 +180,8 @@ namespace BDSM
         public ICommand OpenIniFolderCommand { get; }
         public ICommand OpenInstallFolderCommand { get; }
         public ICommand OpenMapSaveFolderCommand { get; }
+        // --- NEW COMMAND ---
+        public ICommand ImportServerCommand { get; }
 
 
         public ClustersViewModel(GlobalConfig globalConfig, ApplicationViewModel appViewModel)
@@ -209,6 +209,61 @@ namespace BDSM
             OpenInstallFolderCommand = new RelayCommand(_ => OpenFolder("Install"), _ => IsServerSelected && IsSelectedServerInstalled);
             OpenMapSaveFolderCommand = new RelayCommand(_ => OpenFolder("MapSave"), _ => IsServerSelected && IsSelectedServerInstalled);
             VerifyServerFilesCommand = new RelayCommand(async _ => await VerifyServerFilesAsync(), _ => IsServerSelected && IsSelectedServerEditable && IsSelectedServerInstalled && !TaskSchedulerService.IsMajorOperationInProgress);
+
+            // --- NEW COMMAND INITIALIZATION ---
+            ImportServerCommand = new RelayCommand(async _ => await ImportServerAsync(), _ => IsServerSelected);
+        }
+
+        // --- NEW METHOD FOR THE COMMAND ---
+        private async Task ImportServerAsync()
+        {
+            if (SelectedServer == null) return;
+
+            // 1. Prompt user to select the server's root installation directory
+            string? selectedFolderPath = null;
+            BrowseForFolder(string.Empty, path => selectedFolderPath = path);
+
+            if (string.IsNullOrWhiteSpace(selectedFolderPath))
+            {
+                return; // User cancelled
+            }
+
+            // 2. Locate the GameUserSettings.ini file
+            string iniPath = Path.Combine(selectedFolderPath, "ShooterGame", "Saved", "Config", "WindowsServer", "GameUserSettings.ini");
+            if (!File.Exists(iniPath))
+            {
+                MessageBox.Show($"GameUserSettings.ini not found in the selected folder.\n\nExpected path: {iniPath}", "Import Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // 3. Use IniFileManager to parse the file
+            var iniManager = new IniFileManager(iniPath);
+            await iniManager.LoadAsync();
+
+            // 4. Extract data and populate the selected server's properties
+            SelectedServer.InstallDir = selectedFolderPath;
+
+            var sessionName = iniManager.GetValue("SessionSettings", "SessionName");
+            if (!string.IsNullOrEmpty(sessionName)) SelectedServer.SessionName = sessionName;
+
+            var portStr = iniManager.GetValue("ServerSettings", "Port");
+            if (int.TryParse(portStr, out int port)) SelectedServer.Port = port;
+
+            var queryPortStr = iniManager.GetValue("ServerSettings", "QueryPort");
+            if (int.TryParse(queryPortStr, out int queryPort)) SelectedServer.QueryPort = queryPort;
+
+            var rconPortStr = iniManager.GetValue("ServerSettings", "RCONPort");
+            if (int.TryParse(rconPortStr, out int rconPort)) SelectedServer.RconPort = rconPort;
+
+            var adminPassStr = iniManager.GetValue("ServerSettings", "ServerAdminPassword");
+            if (!string.IsNullOrEmpty(adminPassStr)) SelectedServer.RconPassword = adminPassStr;
+
+            // 5. Force the UI to refresh with the new data
+            var temp = SelectedServer;
+            SelectedServer = null; // This clears all bindings
+            SelectedServer = temp;  // This re-applies the object, triggering all UI updates
+
+            NotificationService.ShowInfo($"Successfully imported settings from {selectedFolderPath}");
         }
 
         private void OpenFolder(string folderType)
@@ -327,8 +382,6 @@ namespace BDSM
             return true;
         }
 
-        #region .ini Sync Methods
-
         private async Task LoadFromIniAsync()
         {
             if (SelectedServer == null) return;
@@ -382,8 +435,6 @@ namespace BDSM
             await iniManager.SaveAsync();
             NotificationService.ShowInfo("Settings saved to GameUserSettings.ini.");
         }
-
-        #endregion
 
         private async Task InstallApi()
         {

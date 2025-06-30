@@ -8,6 +8,10 @@ using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 
 namespace BDSM
 {
@@ -38,6 +42,8 @@ namespace BDSM
         public ICommand ShowWatchdogCommand { get; }
         public ICommand ShowEventLogCommand { get; }
         public StatusBarViewModel StatusBar { get; }
+
+        public ICommand ManualUpdateCheckCommand { get; }
 
         private bool _hasNewErrorLogs;
         public bool HasNewErrorLogs
@@ -79,20 +85,33 @@ namespace BDSM
                 CurrentView = _watchdogView;
             });
             ShowEventLogCommand = new RelayCommand(_ => {
-                // Lazily create the view model
                 if (_eventLogView == null) { _eventLogView = new EventLogView { DataContext = new EventLogViewModel() }; }
-                // Refresh the log every time it's viewed
                 else { ((_eventLogView as EventLogView).DataContext as EventLogViewModel).RefreshLogCommand.Execute(null); }
                 CurrentView = _eventLogView;
-                HasNewErrorLogs = false; // "Read" the new logs
+                HasNewErrorLogs = false;
             });
 
             StartUpdateCommand = new RelayCommand(async _ => await StartUpdate(), _ => Clusters.SelectMany(c => c.Servers).Any(s => s.IsInstalled && s.IsUpdateAvailable));
 
-            // Subscribe to the logging service event
+            ManualUpdateCheckCommand = new RelayCommand(async _ => await RunManualUpdateCheck(), _ => !TaskSchedulerService.IsMajorOperationInProgress);
+
             LoggingService.OnNewLogEntry += OnNewLogEntry;
 
             InitializationTask = InitializeApplication();
+        }
+
+        private async Task RunManualUpdateCheck()
+        {
+            if (TaskSchedulerService.IsMajorOperationInProgress)
+            {
+                NotificationService.ShowInfo("Cannot check for updates while another operation is in progress.");
+                return;
+            }
+
+            NotificationService.ShowInfo("Manually checking all servers for updates...");
+            await CheckAllServersForUpdate();
+            UpdateSchedulerService.RecalculateNextRunTime(); // Reset the timer
+            NotificationService.ShowInfo("Update check complete.");
         }
 
         private void OnNewLogEntry(LogLevel level)
@@ -103,6 +122,62 @@ namespace BDSM
                 {
                     HasNewErrorLogs = true;
                 });
+            }
+        }
+
+        private async Task CleanWatchdogChannelAsync()
+        {
+            if (_config == null || string.IsNullOrWhiteSpace(_config.WatchdogDiscordWebhookUrl) || string.IsNullOrWhiteSpace(_config.BotToken))
+            {
+                return;
+            }
+
+            string channelId = string.Empty;
+            List<DiscordMessage> messages;
+
+            try
+            {
+                using (var httpClient = new HttpClient())
+                {
+                    var webhookInfo = await httpClient.GetFromJsonAsync<WebhookInfoResponse>(_config.WatchdogDiscordWebhookUrl);
+                    if (webhookInfo == null || string.IsNullOrWhiteSpace(webhookInfo.ChannelId)) return;
+                    channelId = webhookInfo.ChannelId;
+                }
+
+                using (var authClient = new HttpClient())
+                {
+                    authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", _config.BotToken);
+                    messages = await authClient.GetFromJsonAsync<List<DiscordMessage>>($"https://discord.com/api/v9/channels/{channelId}/messages?limit=100");
+                }
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Log($"Failed to fetch messages for initial cleanup: {ex.Message}", LogLevel.Warning);
+                return;
+            }
+
+            if (messages == null || !messages.Any())
+            {
+                return;
+            }
+
+            try
+            {
+                using (var authClient = new HttpClient())
+                {
+                    authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", _config.BotToken);
+                    foreach (var message in messages)
+                    {
+                        var deleteUrl = $"https://discord.com/api/v9/channels/{channelId}/messages/{message.Id}";
+                        await authClient.DeleteAsync(deleteUrl);
+                        await Task.Delay(1100);
+                    }
+                }
+                LoggingService.Log($"Successfully cleaned {messages.Count} old messages from the watchdog channel.", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Log($"An error occurred during watchdog channel cleanup: {ex.Message}", LogLevel.Warning);
             }
         }
 
@@ -172,13 +247,15 @@ namespace BDSM
                 var versionCheckTasks = allServers.Select(server => server.CheckForUpdate()).ToList();
                 await Task.WhenAll(versionCheckTasks);
 
-                // Original, simple service startup
                 DataLogger.InitializeDatabase(_config.BackupPath);
                 TaskSchedulerService.ClearLastRunHistory();
                 TaskSchedulerService.Start(_config, this);
                 TaskSchedulerService.PreventMissedTasksOnStartup();
                 BackupSchedulerService.Start(_config, this);
                 UpdateSchedulerService.Start(_config, this);
+
+                _ = CleanWatchdogChannelAsync();
+
                 _ = WatchdogService.InitializeAndStart(_config, this);
                 _ = DiscordBotService.StartAsync(_config, _services);
 
@@ -190,10 +267,14 @@ namespace BDSM
 
             return isFirstRun;
         }
+
         public async Task CheckAllServersForUpdate()
         {
             var allServers = Clusters.SelectMany(c => c.Servers).Where(s => s.IsInstalled);
             await Task.WhenAll(allServers.Select(svm => svm.CheckForUpdate()).ToList());
+
+            // THIS IS THE FIX: Forcing the UI to re-evaluate all command states
+            Application.Current.Dispatcher.Invoke(CommandManager.InvalidateRequerySuggested);
 
             await UpdateLatestBuildIdAsync();
         }
@@ -222,5 +303,7 @@ namespace BDSM
                 StatusBar.LatestBuildText = "Latest Build: API Error";
             }
         }
+
+        private record WebhookInfoResponse([property: JsonPropertyName("channel_id")] string ChannelId);
     }
 }

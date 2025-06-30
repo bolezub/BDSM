@@ -21,15 +21,26 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Button Grid.Row="0"
-                Command="{Binding FetchMessagesCommand}"
-                IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"
-                Margin="0,0,0,10">
-            <StackPanel Orientation="Horizontal">
-                <materialDesign:PackIcon Kind="Magnify" Margin="0,0,8,0"/>
-                <TextBlock Text="Fetch Last 100 Message IDs"/>
-            </StackPanel>
-        </Button>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Command="{Binding FetchMessagesCommand}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Magnify" Margin="0,0,8,0"/>
+                    <TextBlock Text="Fetch Last 100 Message IDs"/>
+                </StackPanel>
+            </Button>
+
+            <Button Command="{Binding DeleteMessagesCommand}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"
+                    Background="IndianRed"
+                    Margin="10,0,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="TrashCanOutline" Margin="0,0,8,0"/>
+                    <TextBlock Text="Delete Fetched Messages"/>
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
 
         <ListView Grid.Row="1"
                   ItemsSource="{Binding MessageIds}"

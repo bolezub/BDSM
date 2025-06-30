@@ -16,8 +16,6 @@ namespace BDSM
         private ScheduledTask? _selectedTask;
         private readonly DispatcherTimer _countdownTimer;
 
-        // --- NEW PROPERTIES FOR EDITING ---
-        // The UI will bind to these properties. They act as a temporary buffer.
         private string _editingName = "";
         public string EditingName { get => _editingName; set { _editingName = value; OnPropertyChanged(); } }
 
@@ -50,7 +48,6 @@ namespace BDSM
 
         private bool _editingRunsOnSunday;
         public bool EditingRunsOnSunday { get => _editingRunsOnSunday; set { _editingRunsOnSunday = value; OnPropertyChanged(); } }
-        // --- END OF NEW PROPERTIES ---
 
         public ObservableCollection<ScheduledTask> ScheduledTasks { get; set; }
 
@@ -60,7 +57,6 @@ namespace BDSM
             set
             {
                 _selectedTask = value;
-                // When a task is selected, copy its properties to the editing properties.
                 if (_selectedTask != null)
                 {
                     EditingName = _selectedTask.Name;
@@ -116,11 +112,27 @@ namespace BDSM
             if (SelectedTask?.NextCalculatedRunTime is { } nextRun)
             {
                 var timeRemaining = nextRun - DateTime.Now;
-                TimeUntilNextRun = timeRemaining.TotalSeconds > 0 ? $"(in {timeRemaining:hh\\:mm\\:ss})" : "(Due)";
+                if (timeRemaining.TotalSeconds > 0)
+                {
+                    // --- IMPROVED FORMATTING LOGIC ---
+                    // Now displays days if the countdown is more than 24 hours.
+                    if (timeRemaining.TotalDays >= 1)
+                    {
+                        TimeUntilNextRun = $"(in {timeRemaining:d'd 'hh'h 'mm'm 'ss's'})";
+                    }
+                    else
+                    {
+                        TimeUntilNextRun = $"(in {timeRemaining:hh\\:mm\\:ss})";
+                    }
+                }
+                else
+                {
+                    TimeUntilNextRun = "(Due)";
+                }
             }
             else
             {
-                TimeUntilNextRun = "";
+                TimeUntilNextRun = "(No future run scheduled)";
             }
         }
 
@@ -138,9 +150,9 @@ namespace BDSM
             if (result == MessageBoxResult.Yes)
             {
                 var taskToRemove = SelectedTask;
-                SelectedTask = null; // Clear selection
+                SelectedTask = null;
                 ScheduledTasks.Remove(taskToRemove);
-                SaveSchedulesToFile(); // Save the removal immediately
+                SaveSchedulesToFile();
             }
         }
 
@@ -148,7 +160,6 @@ namespace BDSM
         {
             if (SelectedTask == null) return;
 
-            // Copy the edited values from the temporary properties back to the actual task object.
             SelectedTask.Name = EditingName;
             SelectedTask.TaskType = EditingTaskType;
             SelectedTask.ScheduledTime = EditingScheduledTime;
@@ -168,13 +179,10 @@ namespace BDSM
         {
             try
             {
-                // Now that the config object is correctly updated, save it to the file.
                 _config.Schedules = ScheduledTasks.ToList();
                 string updatedJson = JsonConvert.SerializeObject(_config, Formatting.Indented);
                 File.WriteAllText("config.json", updatedJson);
 
-                // With the new logic in ScheduledTask.cs, we no longer need special handling here.
-                // We just need to tell the service to re-evaluate the next task from the updated schedule.
                 TaskSchedulerService.UpdateNextScheduledTask();
 
                 NotificationService.ShowInfo("Schedules saved successfully!");

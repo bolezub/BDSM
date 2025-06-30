@@ -70,6 +70,13 @@ namespace BDSM
             set { _config.BotToken = value; OnPropertyChanged(); }
         }
 
+        // --- NEW PROPERTY FOR THE UI ---
+        public string StartArgumentsTemplate
+        {
+            get => _config.StartArgumentsTemplate;
+            set { _config.StartArgumentsTemplate = value; OnPropertyChanged(); }
+        }
+
         public int BackupIntervalMinutes
         {
             get => _config.BackupIntervalMinutes;
@@ -88,7 +95,6 @@ namespace BDSM
             set { _config.ShutdownTimeoutSeconds = value; OnPropertyChanged(); }
         }
 
-        // --- NEW PROPERTY ---
         public int SteamCmdTimeoutMinutes
         {
             get => _config.SteamCmdTimeoutMinutes;

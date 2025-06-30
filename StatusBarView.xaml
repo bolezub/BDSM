@@ -9,6 +9,41 @@
              d:DesignHeight="30" d:DesignWidth="800">
     <Border Background="Transparent" Padding="10,5">
         <StackPanel Orientation="Horizontal">
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <materialDesign:PackIcon Kind="Steam" Foreground="LightGray" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding LatestBuildText}" Foreground="LightGray" Margin="5,0,0,0" VerticalAlignment="Center"/>
+
+                <Button Command="{Binding DataContext.ManualUpdateCheckCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        Margin="5,0,0,0"
+                        Width="20" Height="20"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        Cursor="Hand">
+                    <Button.ToolTip>
+                        <ToolTip Style="{StaticResource AppToolTipStyle}" Content="Check for updates now"/>
+                    </Button.ToolTip>
+                    <materialDesign:PackIcon Kind="Refresh" Width="15" Height="15" Foreground="White"/>
+                </Button>
+
+                <Button Command="{Binding DataContext.StartUpdateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        Margin="5,0,0,0"
+                        Width="20" Height="20"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        Cursor="Hand"
+                        Visibility="{Binding IsEnabled, RelativeSource={RelativeSource Self}, Converter={StaticResource BoolToVis}}">
+                    <Button.ToolTip>
+                        <ToolTip Style="{StaticResource AppToolTipStyle}" Content="Start update for all pending servers"/>
+                    </Button.ToolTip>
+                    <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="16" Height="16" Foreground="Orange"/>
+                </Button>
+            </StackPanel>
+
+            <Separator Margin="15,5"/>
+
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <materialDesign:PackIcon Kind="DatabaseSyncOutline" Foreground="LightGray" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding NextBackupText}" Foreground="LightGray" Margin="5,0,0,0" VerticalAlignment="Center"/>
@@ -26,13 +61,6 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <materialDesign:PackIcon Kind="ClockOutline" Foreground="LightGray" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding NextScheduledTaskText}" Foreground="LightGray" Margin="5,0,0,0" VerticalAlignment="Center"/>
-            </StackPanel>
-
-            <Separator Margin="15,5"/>
-
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <materialDesign:PackIcon Kind="Steam" Foreground="LightGray" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding LatestBuildText}" Foreground="LightGray" Margin="5,0,0,0" VerticalAlignment="Center"/>
             </StackPanel>
 
         </StackPanel>
