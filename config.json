@@ -237,7 +237,7 @@
   "startArgumentsTemplate": "{mapFolder}?listen?MultiHome={serverIP}?Port={port}?QueryPort={queryPort}?AllowCrateSpawnsOnTopOfStructures=True -noundermeshchecking -noundermeshkilling -EnableIdlePlayerKick -clusterid={clusterId} -ClusterDirOverride=d:\\asadata -NoTransferFromFiltering -forcerespawndinos -servergamelog -servergamelogincludetribelogs -ServerRCONOutputTribeLogs -nobattleye -WinLiveMaxPlayers=60",
   "appId": "2430930",
   "steamApiUrl": "https://api.steamcmd.net/v1/info/2430930",
-  "discordWebhookUrl": "https://discord.com/api/webhooks/1250776509204008960/gSza2zLAiZj58IHqG5A_UifkkH10VARM5u96rtA7jU5Om2latyDPxAtzjMKJBHcR-ty-",
-  "watchdogDiscordWebhookUrl": "https://discord.com/api/webhooks/1388962479182446663/HvA4dkm--vNMJInaKkPbIBjY62dkzT2j1ngbDy16saEh4Ph1VnOSnzESsdxx8SBqgK2A",
+  "discordWebhookUrl":,
+  "watchdogDiscordWebhookUrl":,
   "shutdownTimeoutSeconds": 180
 }
