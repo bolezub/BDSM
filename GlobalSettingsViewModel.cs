@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Collections.ObjectModel;
+using System.Text;
 
 namespace BDSM
 {
@@ -70,7 +71,12 @@ namespace BDSM
             set { _config.BotToken = value; OnPropertyChanged(); }
         }
 
-        // --- NEW PROPERTY FOR THE UI ---
+        public string BotPrefix
+        {
+            get => _config.BotPrefix;
+            set { _config.BotPrefix = value; OnPropertyChanged(); }
+        }
+
         public string StartArgumentsTemplate
         {
             get => _config.StartArgumentsTemplate;
@@ -107,6 +113,8 @@ namespace BDSM
         public ICommand BrowseTemplatePathCommand { get; }
         public ICommand AddMapCommand { get; }
         public ICommand RemoveMapCommand { get; }
+        // --- NEW COMMAND ---
+        public ICommand ShowBotHelpCommand { get; }
 
         public GlobalSettingsViewModel(GlobalConfig globalConfig)
         {
@@ -121,6 +129,34 @@ namespace BDSM
 
             AddMapCommand = new RelayCommand(_ => AddMap(), _ => !string.IsNullOrWhiteSpace(NewMapName) && !EditableAvailableMaps.Contains(NewMapName));
             RemoveMapCommand = new RelayCommand(_ => RemoveMap(), _ => SelectedMap != null);
+
+            // --- NEW COMMAND INITIALIZATION ---
+            ShowBotHelpCommand = new RelayCommand(_ => ShowBotHelp());
+        }
+
+        // --- NEW METHOD TO DISPLAY HELP ---
+        private void ShowBotHelp()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("To use the Discord bot, you must create your own bot application and invite it to your server.");
+            sb.AppendLine();
+            sb.AppendLine("--- Part 1: Create the Bot ---");
+            sb.AppendLine("1. Go to the Discord Developer Portal (discord.com/developers/applications).");
+            sb.AppendLine("2. Click 'New Application' and give it a name (e.g., 'My ASA Bot').");
+            sb.AppendLine("3. Go to the 'Bot' tab on the left menu.");
+            sb.AppendLine("4. Scroll down to 'Privileged Gateway Intents' and turn ON both 'SERVER MEMBERS INTENT' and 'MESSAGE CONTENT INTENT'.");
+            sb.AppendLine("5. Click 'Reset Token' to generate your bot's token. Copy this token and paste it into the 'Discord Bot Token' field in this application.");
+            sb.AppendLine();
+            sb.AppendLine("--- Part 2: Invite the Bot to Your Server ---");
+            sb.AppendLine("1. In the Developer Portal, go to 'OAuth2' -> 'URL Generator'.");
+            sb.AppendLine("2. In 'Scopes', check the 'bot' box.");
+            sb.AppendLine("3. In 'Bot Permissions' that appears below, check 'Send Messages', 'Read Message History', and 'Embed Links'.");
+            sb.AppendLine("4. Copy the generated URL at the bottom, paste it into your browser, and invite the bot to your Discord server.");
+            sb.AppendLine();
+            sb.AppendLine("--- Part 3: Check Channel Permissions ---");
+            sb.AppendLine("1. In your Discord server, make sure the bot's role has permission to View, Read, and Send messages in the channel(s) where you want to use commands.");
+
+            MessageBox.Show(sb.ToString(), "Discord Bot Setup Instructions", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void AddMap()

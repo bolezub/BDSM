@@ -69,6 +69,7 @@ namespace BDSM
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsServerSelected));
                 OnPropertyChanged(nameof(SelectedServerMapSpecificMods));
+                OnPropertyChanged(nameof(SelectedServerAliases)); // Refresh aliases on selection change
                 OnPropertyChanged(nameof(IsSelectedServerInstalled));
                 OnPropertyChanged(nameof(ShowInstallButton));
                 OnPropertyChanged(nameof(IsSelectedServerEditable));
@@ -162,6 +163,30 @@ namespace BDSM
             }
         }
 
+        // --- NEW PROPERTY FOR ALIASES ---
+        public string SelectedServerAliases
+        {
+            get => SelectedServer != null ? string.Join(", ", SelectedServer.Aliases) : "";
+            set
+            {
+                if (SelectedServer != null)
+                {
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        SelectedServer.Aliases.Clear();
+                    }
+                    else
+                    {
+                        SelectedServer.Aliases = value.Split(',')
+                            .Select(s => s.Trim())
+                            .Where(s => !string.IsNullOrWhiteSpace(s))
+                            .ToList();
+                    }
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public List<string> AvailableMaps => _config.AvailableMaps;
 
         public ICommand SaveSettingsCommand { get; }
@@ -180,7 +205,6 @@ namespace BDSM
         public ICommand OpenIniFolderCommand { get; }
         public ICommand OpenInstallFolderCommand { get; }
         public ICommand OpenMapSaveFolderCommand { get; }
-        // --- NEW COMMAND ---
         public ICommand ImportServerCommand { get; }
 
 
@@ -210,25 +234,21 @@ namespace BDSM
             OpenMapSaveFolderCommand = new RelayCommand(_ => OpenFolder("MapSave"), _ => IsServerSelected && IsSelectedServerInstalled);
             VerifyServerFilesCommand = new RelayCommand(async _ => await VerifyServerFilesAsync(), _ => IsServerSelected && IsSelectedServerEditable && IsSelectedServerInstalled && !TaskSchedulerService.IsMajorOperationInProgress);
 
-            // --- NEW COMMAND INITIALIZATION ---
             ImportServerCommand = new RelayCommand(async _ => await ImportServerAsync(), _ => IsServerSelected);
         }
 
-        // --- NEW METHOD FOR THE COMMAND ---
         private async Task ImportServerAsync()
         {
             if (SelectedServer == null) return;
 
-            // 1. Prompt user to select the server's root installation directory
             string? selectedFolderPath = null;
             BrowseForFolder(string.Empty, path => selectedFolderPath = path);
 
             if (string.IsNullOrWhiteSpace(selectedFolderPath))
             {
-                return; // User cancelled
+                return;
             }
 
-            // 2. Locate the GameUserSettings.ini file
             string iniPath = Path.Combine(selectedFolderPath, "ShooterGame", "Saved", "Config", "WindowsServer", "GameUserSettings.ini");
             if (!File.Exists(iniPath))
             {
@@ -236,11 +256,9 @@ namespace BDSM
                 return;
             }
 
-            // 3. Use IniFileManager to parse the file
             var iniManager = new IniFileManager(iniPath);
             await iniManager.LoadAsync();
 
-            // 4. Extract data and populate the selected server's properties
             SelectedServer.InstallDir = selectedFolderPath;
 
             var sessionName = iniManager.GetValue("SessionSettings", "SessionName");
@@ -258,10 +276,9 @@ namespace BDSM
             var adminPassStr = iniManager.GetValue("ServerSettings", "ServerAdminPassword");
             if (!string.IsNullOrEmpty(adminPassStr)) SelectedServer.RconPassword = adminPassStr;
 
-            // 5. Force the UI to refresh with the new data
             var temp = SelectedServer;
-            SelectedServer = null; // This clears all bindings
-            SelectedServer = temp;  // This re-applies the object, triggering all UI updates
+            SelectedServer = null;
+            SelectedServer = temp;
 
             NotificationService.ShowInfo($"Successfully imported settings from {selectedFolderPath}");
         }
@@ -576,6 +593,23 @@ namespace BDSM
 
         private void SaveSettings()
         {
+            // --- NEW: Duplicate Alias Validation ---
+            var allAliases = Clusters.SelectMany(c => c.Servers)
+                                     .SelectMany(s => s.Aliases)
+                                     .Select(a => a.ToLowerInvariant());
+
+            var duplicateAlias = allAliases.GroupBy(a => a)
+                                           .Where(g => g.Count() > 1)
+                                           .Select(g => g.Key)
+                                           .FirstOrDefault();
+
+            if (duplicateAlias != null)
+            {
+                MessageBox.Show($"Save failed. The alias '{duplicateAlias}' is used for more than one server. Please ensure all aliases are unique.", "Duplicate Alias Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            // --- END of new validation ---
+
             if (SelectedCluster != null)
             {
                 SelectedCluster.Servers = ServersInSelectedCluster.ToList();

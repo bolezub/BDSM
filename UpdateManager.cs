@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,7 +23,10 @@ namespace BDSM
 
     public static class UpdateManager
     {
-        private static readonly HttpClient httpClient = new HttpClient();
+        private static readonly HttpClient httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
 
         public static async Task PerformUpdateProcessAsync(List<ServerViewModel> allServersToUpdate, GlobalConfig config)
         {
@@ -30,6 +34,7 @@ namespace BDSM
             {
                 return;
             }
+            await WatchdogService.DisplayMaintenanceMessageAsync("SERVER UPDATE IN PROGRESS");
             TaskSchedulerService.SetOperationLock();
 
             var steamCmdSemaphore = new SemaphoreSlim(1, 1);
@@ -42,20 +47,17 @@ namespace BDSM
                 {
                     var pipelineTask = Task.Run(async () =>
                     {
-                        // Capture the server's state BEFORE the update process begins
                         bool shouldRestart = server.Status == "Running" || server.Status == "Starting";
 
-                        // Part 1: Shutdown
                         if (server.Status == "Running")
                         {
-                            await GracefulShutdownAsync(new List<ServerViewModel> { server }, config, "update", false);
+                            await GracefulShutdownAsync(new List<ServerViewModel> { server }, config, "update");
                         }
                         else if (server.Status == "Starting")
                         {
                             await server.KillProcessAsync(force: true);
                         }
 
-                        // Part 2: Final Process Verification
                         bool processIsGone = await EnsureProcessHasExited(server);
                         if (!processIsGone)
                         {
@@ -66,7 +68,6 @@ namespace BDSM
                             return;
                         }
 
-                        // Part 3: Enter the Update Queue and Execute
                         await steamCmdSemaphore.WaitAsync();
                         try
                         {
@@ -77,21 +78,16 @@ namespace BDSM
                             steamCmdSemaphore.Release();
                         }
 
-                        // If SteamCMD itself reported an error, abort here.
                         if (server.Status == "Error")
                         {
                             return;
                         }
 
-                        // --- Part 4: Post-Update Finalization (THE FIX) ---
-                        // 1. Set status to Stopped to indicate the update operation is complete.
                         server.Status = "Stopped";
 
-                        // 2. Re-check the server version to refresh the UI and remove the update icon.
-                        await server.CheckForUpdate();
+                        string? latestBuild = await GetLatestBuildIdAsync(config.SteamApiUrl, config.AppId);
+                        await server.CheckForUpdate(latestBuild);
 
-                        // --- Part 5: Restart (if needed) ---
-                        // This will now work because the preconditions (Status is "Stopped") are met.
                         if (shouldRestart)
                         {
                             await SendDiscordMessageAsync(config, server, "Update complete. Server is restarting...");
@@ -130,26 +126,34 @@ namespace BDSM
             return false;
         }
 
+        // --- THIS METHOD HAS BEEN RESTRUCTURED ---
         public static async Task PerformSimpleRebootAsync(List<ServerViewModel> activeServers, GlobalConfig config)
         {
             if (TaskSchedulerService.IsMajorOperationInProgress) return;
+            await WatchdogService.DisplayMaintenanceMessageAsync("DAILY RESTART IN PROGRESS");
             TaskSchedulerService.SetOperationLock();
             try
             {
-                var runningServers = activeServers.Where(s => s.Status == "Running").ToList();
-                if (runningServers.Any())
+                var rebootTasks = activeServers.Select(server => Task.Run(async () =>
                 {
-                    await GracefulShutdownAsync(runningServers, config, "scheduled restart", false);
-                }
-
-                foreach (var server in activeServers)
-                {
-                    if (server.Status == "Stopped")
+                    if (server.Status == "Running")
                     {
-                        server.StartServer();
-                        await Task.Delay(5000);
+                        // If the server is running, perform the graceful shutdown and then restart.
+                        await GracefulShutdownAsync(new List<ServerViewModel> { server }, config, "daily restart");
+                        if (server.Status == "Stopped")
+                        {
+                            server.StartServer();
+                        }
                     }
-                }
+                    else if (server.Status == "Stopped")
+                    {
+                        // If the server is already stopped, just start it.
+                        LoggingService.Log($"Server '{server.ServerName}' was stopped, starting it as part of daily restart.", LogLevel.Info);
+                        server.StartServer();
+                    }
+                })).ToList();
+
+                await Task.WhenAll(rebootTasks);
             }
             finally
             {
@@ -174,18 +178,20 @@ namespace BDSM
                 await process.WaitForExitAsync();
             }
         }
-
+        
         public static async Task PerformMaintenanceShutdownAsync(List<ServerViewModel> activeServers, GlobalConfig config)
         {
             if (TaskSchedulerService.IsMajorOperationInProgress) return;
+            await WatchdogService.DisplayMaintenanceMessageAsync("MAINTENANCE SHUTDOWN IN PROGRESS");
             TaskSchedulerService.SetOperationLock();
             try
             {
-                var runningServers = activeServers.Where(s => s.Status == "Running").ToList();
-                if (runningServers.Any())
-                {
-                    await GracefulShutdownAsync(runningServers, config, "maintenance", false);
-                }
+                var shutdownTasks = activeServers
+                    .Where(s => s.Status == "Running")
+                    .Select(server => GracefulShutdownAsync(new List<ServerViewModel> { server }, config, "maintenance"))
+                    .ToList();
+                
+                await Task.WhenAll(shutdownTasks);
             }
             finally
             {
@@ -196,10 +202,13 @@ namespace BDSM
         public static async Task PerformScheduledRebootAsync(List<ServerViewModel> activeServers, GlobalConfig config)
         {
             if (TaskSchedulerService.IsMajorOperationInProgress) return;
+            await WatchdogService.DisplayMaintenanceMessageAsync("SCHEDULED RESTART/UPDATE IN PROGRESS");
             TaskSchedulerService.SetOperationLock();
             try
             {
-                await Task.WhenAll(activeServers.Select(s => s.CheckForUpdate()));
+                string? latestBuild = await GetLatestBuildIdAsync(config.SteamApiUrl, config.AppId);
+                
+                await Task.WhenAll(activeServers.Select(s => s.CheckForUpdate(latestBuild)));
 
                 var serversToUpdate = activeServers.Where(s => s.IsUpdateAvailable).ToList();
                 var serversToReboot = activeServers.Where(s => !s.IsUpdateAvailable).ToList();
@@ -215,22 +224,21 @@ namespace BDSM
             }
         }
 
-        private static async Task GracefulShutdownAsync(List<ServerViewModel> servers, GlobalConfig config, string reason, bool runUpdateAfter)
+        private static async Task GracefulShutdownAsync(List<ServerViewModel> servers, GlobalConfig config, string reason)
         {
             foreach (var server in servers)
             {
                 server.Status = "Update Pending";
                 string actionWord = reason == "maintenance" ? "shutting down" : "restarting";
-                string initialMsg = $"Server {reason} initiated. Server {actionWord} in 15 minutes or when empty.";
+
+                int shutdownMinutes = config.ShutdownTimeoutSeconds > 0 ? config.ShutdownTimeoutSeconds / 60 : 15;
+                string initialMsg = $"Server {reason} initiated. Server {actionWord} in {shutdownMinutes} minutes or when empty.";
+
                 await server.SendRconCommandAsync($"ServerChat {initialMsg}");
                 await SendDiscordMessageAsync(config, server, initialMsg);
-            }
 
-            var serverCheckTasks = servers.Select(s => WaitForServerEmptyOrTimeout(s, config.ShutdownTimeoutSeconds)).ToList();
-            await Task.WhenAll(serverCheckTasks);
+                await WaitForServerEmptyOrTimeout(server, config, reason, actionWord);
 
-            foreach (var server in servers)
-            {
                 server.Status = "Shutting Down";
                 string finalMsg = (server.CurrentPlayers == 0) ? $"Server is empty. Shutting down for {reason} now." : $"Final shutdown for {reason}. Goodbye!";
                 await server.SendRconCommandAsync($"ServerChat {finalMsg}");
@@ -241,12 +249,39 @@ namespace BDSM
             await Task.WhenAll(servers.Select(s => WaitForExit(s, config)));
         }
 
-        private static async Task WaitForServerEmptyOrTimeout(ServerViewModel server, int timeoutSeconds)
+        private static async Task WaitForServerEmptyOrTimeout(ServerViewModel server, GlobalConfig config, string reason, string actionWord)
         {
             var stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed.TotalSeconds < timeoutSeconds)
+            int effectiveTimeout = config.ShutdownTimeoutSeconds > 0 ? config.ShutdownTimeoutSeconds : 900;
+            int lastMinuteAnnounced = (int)Math.Ceiling(effectiveTimeout / 60.0);
+
+            while (stopwatch.Elapsed.TotalSeconds < effectiveTimeout)
             {
+                await server.UpdateServerStatus();
+
                 if (server.CurrentPlayers == 0) break;
+
+                int minutesRemaining = (int)Math.Ceiling((effectiveTimeout - stopwatch.Elapsed.TotalSeconds) / 60);
+
+                if (minutesRemaining < lastMinuteAnnounced)
+                {
+                    if (minutesRemaining > 0)
+                    {
+                        var sb = new StringBuilder();
+                        sb.Append($"Server {actionWord} for {reason} in {minutesRemaining} minute(s).");
+                        
+                        if (server.OnlinePlayers.Any())
+                        {
+                            sb.Append($" Players online: {string.Join(", ", server.OnlinePlayers)}");
+                        }
+
+                        string warningMsg = sb.ToString();
+                        await server.SendRconCommandAsync($"ServerChat {warningMsg}");
+                        await SendDiscordMessageAsync(config, server, $"Server {actionWord} for {reason} in {minutesRemaining} minute(s).");
+                    }
+                    lastMinuteAnnounced = minutesRemaining;
+                }
+
                 await Task.Delay(10000);
             }
         }
@@ -254,7 +289,7 @@ namespace BDSM
         private static async Task WaitForExit(ServerViewModel server, GlobalConfig config)
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed.TotalSeconds < config.ShutdownTimeoutSeconds)
+            while (stopwatch.Elapsed.TotalSeconds < 60)
             {
                 if (server.ServerProcess == null || server.ServerProcess.HasExited)
                 {
@@ -273,15 +308,11 @@ namespace BDSM
             server.Status = "Updating";
             await SendDiscordMessageAsync(config, server, "Server files are being updated/repaired via SteamCMD...");
 
-            // --- NEW LOGIC: Clear the .acf manifest file to force an update ---
             try
             {
-                // Construct the path to the appmanifest file.
                 string manifestPath = Path.Combine(server.InstallDir, "steamapps", $"appmanifest_{config.AppId}.acf");
                 if (File.Exists(manifestPath))
                 {
-                    // By writing an empty string, we corrupt the manifest, forcing SteamCMD to
-                    // re-validate and download the latest version from scratch.
                     await File.WriteAllTextAsync(manifestPath, string.Empty);
                     LoggingService.Log($"Cleared manifest file for {server.ServerName} to force update.", LogLevel.Info);
                 }
@@ -290,7 +321,6 @@ namespace BDSM
             {
                 LoggingService.Log($"Could not clear manifest file for {server.ServerName}. Proceeding anyway. Error: {ex.Message}", LogLevel.Warning);
             }
-            // --- END OF NEW LOGIC ---
 
             string steamCmdArgs = $"+login anonymous +force_install_dir \"{server.InstallDir}\" +app_update {config.AppId} validate +quit";
             var processStartInfo = new ProcessStartInfo
@@ -321,28 +351,7 @@ namespace BDSM
                 }
             }
         }
-        public static async Task<UpdateCheckResult> CheckForUpdateAsync(string installDir, string appId, string apiUrl)
-        {
-            var result = new UpdateCheckResult();
-            result.InstalledBuild = await GetInstalledBuildIdAsync(installDir, appId);
-            string? latestBuild = await GetLatestBuildIdAsync(apiUrl, appId);
-
-            bool canTrustInstalledVersion = long.TryParse(result.InstalledBuild, out _);
-            bool canTrustLatestVersion = !string.IsNullOrEmpty(latestBuild) && latestBuild != "0";
-
-            if (canTrustInstalledVersion && canTrustLatestVersion)
-            {
-                result.LatestBuild = latestBuild;
-                result.IsUpdateAvailable = result.InstalledBuild != result.LatestBuild;
-            }
-            else
-            {
-                result.LatestBuild = canTrustLatestVersion ? latestBuild : "API Error";
-                result.IsUpdateAvailable = false;
-            }
-            return result;
-        }
-
+        
         public static async Task<string> GetInstalledBuildIdAsync(string installDir, string appId)
         {
             try
@@ -358,7 +367,7 @@ namespace BDSM
                 return "Error";
             }
         }
-
+        
         public static async Task<string?> GetLatestBuildIdAsync(string apiUrl, string appId)
         {
             try
@@ -368,9 +377,15 @@ namespace BDSM
                 string? buildId = jsonResponse?["data"]?[appId]?["depots"]?["branches"]?["public"]?["buildid"]?.ToString();
                 return buildId;
             }
-            catch (Exception)
+            catch (HttpRequestException httpEx)
             {
-                return "Error";
+                LoggingService.Log($"Steam API request failed. Status: {httpEx.StatusCode?.ToString() ?? "N/A"}. Message: {httpEx.Message}", LogLevel.Warning);
+                return null; 
+            }
+            catch (Exception ex)
+            {
+                LoggingService.Log($"An unexpected error occurred while fetching latest build ID: {ex.Message}", LogLevel.Warning);
+                return null;
             }
         }
 

@@ -38,6 +38,22 @@ namespace BDSM
             RestartTimer();
         }
 
+        // --- THIS METHOD HAS BEEN CORRECTED ---
+        /// <summary>
+        /// Posts a persistent message to the watchdog channel, used for maintenance or update notifications.
+        /// </summary>
+        public static async Task DisplayMaintenanceMessageAsync(string message)
+        {
+            if (_config == null || !_config.Watchdog.IsEnabled) return;
+
+            string content = "```" +
+                             $"\n{message}\n\nPlease wait until the operation is complete.\n" +
+                             "```";
+
+            // This will edit the existing message or post a new one.
+            await UpdateDiscordMessageAsync(content, isGraphMessage: false);
+        }
+
         public static void RestartTimer()
         {
             if (_config == null || !_config.Watchdog.IsEnabled)
@@ -82,6 +98,23 @@ namespace BDSM
             });
         }
 
+        private static string GetStatusEmoji(string status)
+        {
+            return status switch
+            {
+                "Running" => "🟢",
+                "Starting" => "🟡",
+                "Stopped" => "🔴",
+                "Error" => "🔴",
+                "Stopping" => "🟠",
+                "Update Pending" => "🟠",
+                "Shutting Down" => "🟠",
+                "Updating" => "🔵",
+                "Not Installed" => "⚪",
+                _ => "⚫",
+            };
+        }
+
         private static async Task PostStatusTableAsync()
         {
             if (_appViewModel == null || _config == null) return;
@@ -89,24 +122,24 @@ namespace BDSM
             var statusLines = new List<string>();
             foreach (var server in servers)
             {
+                string statusEmoji = GetStatusEmoji(server.Status);
                 string cpuBar = GetTextBar(server.CpuUsage);
                 double ramUsageGB = server.RamUsage;
                 double maxRamGB = server.MaxRam > 0 ? server.MaxRam : 35;
                 double ramPercent = maxRamGB > 0 ? (ramUsageGB / maxRamGB) * 100 : 0;
                 string memBar = GetTextBar(ramPercent);
-                string players = $"{server.CurrentPlayers}/{server.MaxPlayers}".PadRight(5);
-                string pid = server.Pid.PadRight(10);
+
+                string players = $"P:{server.CurrentPlayers}/{server.MaxPlayers}".PadRight(8);
                 string cpu = $"{server.CpuUsage:F1}%".PadLeft(6);
                 string mem = $"{server.RamUsage}GB".PadLeft(7);
-                statusLines.Add($"{server.ServerName,-15} Players:{players} {pid} CPU:{cpu} [{cpuBar}]  Mem:{mem} [{memBar}]");
+                statusLines.Add($"{statusEmoji} {server.ServerName,-15} {players} CPU:{cpu}[{cpuBar}] Mem:{mem}[{memBar}]");
             }
             var sb = new StringBuilder();
             sb.AppendLine("```");
             foreach (var line in statusLines) sb.AppendLine(line);
             sb.AppendLine("```");
 
-            // --- NEW: Add the player list section ---
-            sb.AppendLine("```"); // Start a new code block for the player list
+            sb.AppendLine("```");
             foreach (var server in servers)
             {
                 string playerListString;
@@ -121,7 +154,6 @@ namespace BDSM
                 sb.AppendLine($"{server.ServerName}: {playerListString}");
             }
             sb.AppendLine("```");
-            // --- END of new section ---
 
             await UpdateDiscordMessageAsync(sb.ToString(), isGraphMessage: false);
         }
@@ -221,7 +253,7 @@ namespace BDSM
             _watchdogTimer?.Change(nextInterval, Timeout.InfiniteTimeSpan);
         }
 
-        private static string GetTextBar(double percent, int width = 15)
+        private static string GetTextBar(double percent, int width = 8)
         {
             int p = (int)Math.Min(100, Math.Max(0, percent));
             int filled = (int)Math.Round(p * width / 100.0);

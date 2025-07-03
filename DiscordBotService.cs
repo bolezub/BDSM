@@ -12,12 +12,16 @@ namespace BDSM
         private static DiscordSocketClient? _client;
         private static CommandService? _commands;
         private static IServiceProvider? _services;
+        public static string BotPrefix { get; private set; } = "!";
 
         public static async Task StartAsync(GlobalConfig config, IServiceProvider services)
         {
             _services = services;
 
             if (string.IsNullOrWhiteSpace(config.BotToken)) return;
+
+            // Set the prefix from the configuration when the service starts
+            BotPrefix = config.BotPrefix;
 
             _client = new DiscordSocketClient(new DiscordSocketConfig
             {
@@ -44,8 +48,12 @@ namespace BDSM
         private static async Task HandleCommandAsync(SocketMessage messageParam)
         {
             if (!(messageParam is SocketUserMessage message) || message.Author.IsBot) return;
+
             int argPos = 0;
-            if (!(message.HasCharPrefix('!', ref argPos))) return;
+
+            // THIS IS THE FIX: Using the custom BotPrefix string instead of the hardcoded '!' character.
+            if (!(message.HasStringPrefix(BotPrefix, ref argPos, StringComparison.OrdinalIgnoreCase))) return;
+
             var context = new SocketCommandContext(_client, message);
             await _commands.ExecuteAsync(context: context, argPos: argPos, services: _services);
         }

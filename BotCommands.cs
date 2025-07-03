@@ -10,17 +10,100 @@ namespace BDSM
     public class BotCommands : ModuleBase<SocketCommandContext>
     {
         private readonly ApplicationViewModel _appViewModel;
+        private readonly CommandService _commandService;
 
-        public BotCommands(ApplicationViewModel appViewModel)
+        public BotCommands(ApplicationViewModel appViewModel, CommandService commandService)
         {
             _appViewModel = appViewModel;
+            _commandService = commandService;
         }
+
+        [Command("help")]
+        [Summary("Lists all available commands or shows info about a specific command.")]
+        public async Task HelpAsync([Remainder] string commandName = "")
+        {
+            var embedBuilder = new EmbedBuilder()
+                .WithColor(new Color(0x7289DA))
+                .WithTitle("BDSM Bot Help");
+
+            if (string.IsNullOrWhiteSpace(commandName))
+            {
+                embedBuilder.WithDescription($"Here are all the commands you can use. For more info on a specific command, type `{DiscordBotService.BotPrefix}help <command_name>`.");
+
+                foreach (var module in _commandService.Modules)
+                {
+                    var commandList = new StringBuilder();
+                    foreach (var cmd in module.Commands)
+                    {
+                        if (cmd.Name.Equals("help", StringComparison.OrdinalIgnoreCase)) continue;
+
+                        commandList.AppendLine($"**`{DiscordBotService.BotPrefix}{cmd.Name}`**: {cmd.Summary ?? "No description"}");
+                    }
+
+                    if (commandList.Length > 0)
+                    {
+                        embedBuilder.AddField(module.Name, commandList.ToString());
+                    }
+                }
+            }
+            else
+            {
+                var result = _commandService.Search(Context, commandName);
+
+                if (!result.IsSuccess)
+                {
+                    await ReplyAsync($"Sorry, I couldn't find a command like **{commandName}**.");
+                    return;
+                }
+
+                embedBuilder.WithDescription($"Here's some info about the **`{DiscordBotService.BotPrefix}{commandName}`** command:");
+
+                foreach (var match in result.Commands)
+                {
+                    var cmd = match.Command;
+
+                    var usage = new StringBuilder();
+                    usage.Append($"{DiscordBotService.BotPrefix}{cmd.Name}");
+                    foreach (var param in cmd.Parameters)
+                    {
+                        usage.Append($" <{param.Name}>");
+                    }
+
+                    embedBuilder.AddField("Usage", $"`{usage}`");
+                    embedBuilder.AddField("Description", $"{cmd.Summary ?? "No description"}");
+                }
+            }
+
+            await ReplyAsync(embed: embedBuilder.Build());
+        }
+
 
         [Command("ping")]
         [Summary("A simple test command to check if the bot is responding.")]
         public async Task PingAsync()
         {
             await ReplyAsync("Pong!");
+        }
+
+        // --- NEW COMMAND ---
+        [Command("clusters")]
+        [Summary("Lists all available server clusters.")]
+        public async Task ListClustersAsync()
+        {
+            var clusters = _appViewModel.Clusters.ToList();
+
+            if (!clusters.Any())
+            {
+                await ReplyAsync("No clusters have been configured.");
+                return;
+            }
+
+            var embedBuilder = new EmbedBuilder()
+                .WithTitle("Available Server Clusters")
+                .WithColor(new Color(0x58D68D))
+                .WithDescription(string.Join("\n", clusters.Select(c => $"- {c.Name}")));
+
+            await ReplyAsync(embed: embedBuilder.Build());
         }
 
         [Command("status")]
@@ -53,8 +136,6 @@ namespace BDSM
             await ReplyAsync(sb.ToString());
         }
 
-        // --- NEW INFORMATIONAL COMMAND ---
-
         [Command("players")]
         [Summary("Lists the online players for a specific server.")]
         public async Task ListPlayersAsync([Remainder] string serverName)
@@ -83,15 +164,11 @@ namespace BDSM
             }
         }
 
-        // --- NEW CHAT COMMAND ---
-
         [Command("say")]
         [Summary("Sends a chat message to a specific server.")]
-        [RequireUserPermission(GuildPermission.Administrator)] // SECURITY: Only admins can use this
+        [RequireUserPermission(GuildPermission.Administrator)]
         public async Task SayAsync(string serverName, [Remainder] string message)
         {
-            // Note: For server names with spaces, users will need to put them in quotes.
-            // Example: !say "The Island" Hello everyone
             var server = FindServer(serverName);
             if (server == null)
             {
@@ -109,9 +186,6 @@ namespace BDSM
             await server.SendRconCommandAsync(rconCommand);
             await ReplyAsync($"Message sent to **{server.ServerName}**.");
         }
-
-
-        // --- SINGLE SERVER COMMANDS ---
 
         [Command("start")]
         [Summary("Starts a specific server.")]
@@ -181,8 +255,6 @@ namespace BDSM
                 await ReplyAsync($"Could not restart server **{server.ServerName}**. It may not be running or another operation is in progress.");
             }
         }
-
-        // --- CLUSTER-WIDE COMMANDS ---
 
         [Command("startall")]
         [Summary("Starts all active servers in a specific cluster.")]
@@ -271,13 +343,12 @@ namespace BDSM
             await ReplyAsync($"Message sent to all active, running servers in cluster: **{cluster.Name}**");
         }
 
-        // --- HELPER METHODS ---
-
         private ServerViewModel? FindServer(string serverName)
         {
             return _appViewModel.Clusters
                 .SelectMany(c => c.Servers)
-                .FirstOrDefault(s => s.ServerName.Equals(serverName, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(s => s.ServerName.Equals(serverName, StringComparison.OrdinalIgnoreCase) ||
+                                     s.Aliases.Contains(serverName, StringComparer.OrdinalIgnoreCase));
         }
 
         private ClusterViewModel? FindCluster(string clusterName)

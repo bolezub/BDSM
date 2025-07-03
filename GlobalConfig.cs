@@ -23,13 +23,16 @@ namespace BDSM
         [JsonProperty("botToken")]
         public string BotToken { get; set; } = string.Empty;
 
+        // --- NEW PROPERTY ---
+        [JsonProperty("botPrefix")]
+        public string BotPrefix { get; set; } = "!";
+
         [JsonProperty("backupIntervalMinutes")]
         public int BackupIntervalMinutes { get; set; } = 30;
 
         [JsonProperty("updateCheckIntervalMinutes")]
         public int UpdateCheckIntervalMinutes { get; set; } = 15;
 
-        // --- NEW PROPERTY ---
         [JsonProperty("steamCmdTimeoutMinutes")]
         public int SteamCmdTimeoutMinutes { get; set; } = 30;
 

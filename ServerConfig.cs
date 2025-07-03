@@ -51,4 +51,7 @@ public class ServerConfig
 
     [JsonProperty("hidden")]
     public bool IsHidden { get; set; }
+    
+    [JsonProperty("aliases")]
+    public List<string> Aliases { get; set; } = new List<string>();
 }

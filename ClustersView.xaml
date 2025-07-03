@@ -123,6 +123,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Server Name (Internal):" Margin="0,5,10,5"/>
@@ -198,19 +199,22 @@
                                 <TextBlock Grid.Row="9" Grid.Column="0" Text="RCON Password:" Margin="0,5,10,5"/>
                                 <TextBox Grid.Row="9" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding SelectedServer.RconPassword, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5"/>
 
-                                <TextBlock Grid.Row="10" Grid.Column="0" Text="Map-Specific Mods:" Margin="0,5,10,5"/>
-                                <TextBox Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding SelectedServerMapSpecificMods, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5" ToolTip="Mods to ADD to the main cluster mod list for this server only."/>
+                                <TextBlock Grid.Row="10" Grid.Column="0" Text="Command Aliases:" Margin="0,5,10,5"/>
+                                <TextBox Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding SelectedServerAliases, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5" ToolTip="Comma-separated list of short names for bot commands (e.g. se, scorched)."/>
 
-                                <TextBlock Grid.Row="11" Grid.Column="0" Text="Memory Threshold (GB):" Margin="0,5,10,5"/>
-                                <TextBox Grid.Row="11" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding SelectedServer.MemoryThresholdGB, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="center" Margin="0,5"/>
+                                <TextBlock Grid.Row="11" Grid.Column="0" Text="Map-Specific Mods:" Margin="0,5,10,5"/>
+                                <TextBox Grid.Row="11" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding SelectedServerMapSpecificMods, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,5" ToolTip="Mods to ADD to the main cluster mod list for this server only."/>
 
-                                <CheckBox Grid.Row="12" Grid.Column="0" IsChecked="{Binding SelectedServer.IsClubArk}" Content="Is ClubArk Server" Margin="0,10,10,10" ToolTip="ClubArk servers use ONLY their map-specific mods and ignore the main cluster mod list."/>
-                                <CheckBox Grid.Row="12" Grid.Column="1" IsChecked="{Binding SelectedServer.Active}" Content="Active" Margin="0,10,10,10" ToolTip="Active servers are monitored and included in automated tasks."/>
+                                <TextBlock Grid.Row="12" Grid.Column="0" Text="Memory Threshold (GB):" Margin="0,5,10,5"/>
+                                <TextBox Grid.Row="12" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding SelectedServer.MemoryThresholdGB, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="center" Margin="0,5"/>
 
-                                <CheckBox Grid.Row="13" Grid.Column="0" IsChecked="{Binding SelectedServer.DiscordNotificationsEnabled}" Content="Discord Notifications Enabled" Margin="0,10,10,10"/>
-                                <CheckBox Grid.Row="13" Grid.Column="1" IsChecked="{Binding SelectedServer.IsHidden}" Content="Hidden" Margin="0,10,10,10" ToolTip="Hidden servers do not show up on the main dashboard."/>
+                                <CheckBox Grid.Row="13" Grid.Column="0" IsChecked="{Binding SelectedServer.IsClubArk}" Content="Is ClubArk Server" Margin="0,10,10,10" ToolTip="ClubArk servers use ONLY their map-specific mods and ignore the main cluster mod list."/>
+                                <CheckBox Grid.Row="13" Grid.Column="1" IsChecked="{Binding SelectedServer.Active}" Content="Active" Margin="0,10,10,10" ToolTip="Active servers are monitored and included in automated tasks."/>
 
-                                <CheckBox Grid.Row="14" Grid.Column="0" Grid.ColumnSpan="2" IsChecked="{Binding SelectedServer.UseApiLoader}" Content="Use API Loader" Margin="0,10,10,10" ToolTip="If checked, launches the server via AsaApiLoader.exe. If unchecked, launches the vanilla ArkAscendedServer.exe."/>
+                                <CheckBox Grid.Row="14" Grid.Column="0" IsChecked="{Binding SelectedServer.DiscordNotificationsEnabled}" Content="Discord Notifications Enabled" Margin="0,10,10,10"/>
+                                <CheckBox Grid.Row="14" Grid.Column="1" IsChecked="{Binding SelectedServer.IsHidden}" Content="Hidden" Margin="0,10,10,10" ToolTip="Hidden servers do not show up on the main dashboard."/>
+
+                                <CheckBox Grid.Row="15" Grid.Column="0" Grid.ColumnSpan="2" IsChecked="{Binding SelectedServer.UseApiLoader}" Content="Use API Loader" Margin="0,10,10,10" ToolTip="If checked, launches the server via AsaApiLoader.exe. If unchecked, launches the vanilla ArkAscendedServer.exe."/>
                             </Grid>
                         </Grid>
                     </Border>

@@ -56,6 +56,8 @@ namespace BDSM
 
         public bool UseApiLoader => _serverConfig.UseApiLoader;
 
+        public List<string> Aliases => _serverConfig.Aliases;
+
         public Guid ServerId => _serverConfig.Id;
         public Process? ServerProcess => _serverProcess;
 
@@ -128,12 +130,12 @@ namespace BDSM
                     case "Running": return Brushes.LawnGreen;
                     case "Starting": return Brushes.Yellow;
                     case "Stopped": return Brushes.Red;
-                    case "Stopping": return Brushes.OrangeRed; // This color is fine to keep
+                    case "Stopping": return Brushes.OrangeRed;
                     case "Update Pending": return Brushes.Orange;
                     case "Shutting Down": return Brushes.DarkOrange;
                     case "Updating": return Brushes.DodgerBlue;
                     case "Not Installed": return Brushes.SlateGray;
-                    case "Error": return Brushes.HotPink; // Added for the new Error status
+                    case "Error": return Brushes.HotPink;
                     default: return Brushes.Gray;
                 }
             }
@@ -204,7 +206,6 @@ namespace BDSM
             }
             catch (Exception)
             {
-                // Error logging removed
             }
             Status = "Stopped";
             await Task.CompletedTask;
@@ -240,12 +241,38 @@ namespace BDSM
             detailWindow.Show();
         }
 
-        public async Task CheckForUpdate()
+        // --- THIS IS THE NEW OVERLOADED METHOD ---
+        public async Task CheckForUpdate(string? latestBuildId)
         {
             if (!IsInstalled) return;
-            var result = await UpdateManager.CheckForUpdateAsync(_serverConfig.InstallDir, _globalConfig.AppId, _globalConfig.SteamApiUrl);
-            ServerVersion = $"Build: {result.InstalledBuild}";
-            IsUpdateAvailable = result.IsUpdateAvailable;
+
+            string installedBuild = await UpdateManager.GetInstalledBuildIdAsync(_serverConfig.InstallDir, _globalConfig.AppId);
+            ServerVersion = $"Build: {installedBuild}";
+
+            // If we couldn't get the latest build ID, we can't determine if an update is available.
+            if (string.IsNullOrWhiteSpace(latestBuildId))
+            {
+                IsUpdateAvailable = false;
+                return;
+            }
+
+            bool canTrustInstalledVersion = long.TryParse(installedBuild, out _);
+            if (canTrustInstalledVersion)
+            {
+                IsUpdateAvailable = installedBuild != latestBuildId;
+            }
+            else
+            {
+                IsUpdateAvailable = false;
+            }
+        }
+
+        // The original method is kept for the initial startup check.
+        public async Task CheckForUpdate()
+        {
+            // On initial check, we don't have the latest build ID yet.
+            string? latestBuild = await UpdateManager.GetLatestBuildIdAsync(_globalConfig.SteamApiUrl, _globalConfig.AppId);
+            await CheckForUpdate(latestBuild);
         }
 
         public void StartServer()
@@ -310,7 +337,7 @@ namespace BDSM
                 await rconClient.ConnectAsync();
                 return await rconClient.SendCommandAsync(command);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }
@@ -320,18 +347,9 @@ namespace BDSM
             }
         }
 
-        private bool IsValidPlayerListResponse(string rconResponse)
-        {
-            if (string.IsNullOrWhiteSpace(rconResponse)) return false;
-            if (rconResponse.Contains("No Players Connected")) return true;
-            return rconResponse.Trim().Split('\n').Any(line => line.Contains(","));
-        }
-
         public async Task UpdateServerStatus()
         {
-            // --- THIS IS THE FIX ---
-            // Removed "Stopping" from this condition to allow the monitor to detect when an E-stopped server has closed.
-            if (Status == "Shutting Down" || Status == "Update Pending" || Status == "Updating" || !IsInstalled) return;
+            if (Status == "Shutting Down" || Status == "Updating" || !IsInstalled) return;
 
             var processName = "ArkAscendedServer";
             var allProcesses = Process.GetProcessesByName(processName);
@@ -352,30 +370,33 @@ namespace BDSM
             try
             {
                 string response = await SendRconCommandAsync("listplayers");
+                response = response.Trim();
 
-                if (IsValidPlayerListResponse(response))
+                if (!string.IsNullOrWhiteSpace(response))
                 {
-                    bool wasJustStarted = (Status == "Starting");
-                    Status = "Running";
-                    if (wasJustStarted && this.DiscordNotificationsEnabled)
+                    if (Status != "Running")
                     {
-                        await DiscordNotifier.SendMessageAsync(_globalConfig.discordWebhookUrl, this.ServerName, "Server is online and ready.");
+                        bool wasJustStarting = Status == "Starting" || Status == "Unknown";
+                        Status = "Running";
+                        if (wasJustStarting && this.DiscordNotificationsEnabled && Status != "Update Pending")
+                        {
+                            await DiscordNotifier.SendMessageAsync(_globalConfig.discordWebhookUrl, this.ServerName, "Server is online and ready.");
+                        }
                     }
-                    ParsePlayerInfo(response);
+
+                    ParsePlayerList(response);
                     await DataLogger.LogDataPoint(this.ServerId, CpuUsage, RamUsage);
                 }
                 else
                 {
-                    Status = "Starting";
-                    CurrentPlayers = 0;
-                    OnlinePlayers.Clear();
+                    if (Status != "Update Pending") Status = "Starting";
                 }
             }
             catch (Exception)
             {
-                Status = "Starting";
-                CurrentPlayers = 0;
+                if (Status != "Update Pending") Status = "Starting";
                 OnlinePlayers.Clear();
+                CurrentPlayers = 0;
             }
         }
 
@@ -424,16 +445,21 @@ namespace BDSM
             }
         }
 
-        private void ParsePlayerInfo(string rconResponse)
+        private void ParsePlayerList(string rconResponse)
         {
             OnlinePlayers.Clear();
-            if (string.IsNullOrWhiteSpace(rconResponse) || rconResponse.Contains("No Players Connected"))
+
+            if (string.IsNullOrWhiteSpace(rconResponse) || rconResponse == "No Players Connected")
             {
-                CurrentPlayers = 0; return;
+                CurrentPlayers = 0;
+                return;
             }
+
             var lines = rconResponse.Trim().Split('\n');
             foreach (var line in lines)
             {
+                if (string.IsNullOrWhiteSpace(line) || !line.Contains(",")) continue;
+
                 var parts = line.Split(',');
                 if (parts.Length > 0 && parts[0].IndexOf(' ') != -1)
                 {

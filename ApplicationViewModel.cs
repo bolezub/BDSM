@@ -32,7 +32,6 @@ namespace BDSM
         private object? _watchdogView;
         private object? _eventLogView;
 
-        public ICommand CheckAllServersForUpdateCommand { get; }
         public ICommand StartUpdateCommand { get; }
         public ICommand ShowDashboardCommand { get; }
         public ICommand ShowClustersCommand { get; }
@@ -110,7 +109,7 @@ namespace BDSM
 
             NotificationService.ShowInfo("Manually checking all servers for updates...");
             await CheckAllServersForUpdate();
-            UpdateSchedulerService.RecalculateNextRunTime(); // Reset the timer
+            UpdateSchedulerService.RecalculateNextRunTime();
             NotificationService.ShowInfo("Update check complete.");
         }
 
@@ -259,7 +258,8 @@ namespace BDSM
                 _ = WatchdogService.InitializeAndStart(_config, this);
                 _ = DiscordBotService.StartAsync(_config, _services);
 
-                await UpdateLatestBuildIdAsync();
+                // Make the initial check non-blocking
+                _ = CheckAllServersForUpdate();
             }
 
             _dashboardView = this;
@@ -268,16 +268,32 @@ namespace BDSM
             return isFirstRun;
         }
 
+        // --- METHOD REFACTORED TO BE MORE EFFICIENT ---
         public async Task CheckAllServersForUpdate()
         {
+            if (_config == null) return;
+
+            // Step 1: Fetch the latest build ID only ONCE.
+            string? latestBuild = await UpdateManager.GetLatestBuildIdAsync(_config.SteamApiUrl, _config.AppId);
+
+            // Step 2: Update the status bar immediately with the result.
+            if (!string.IsNullOrEmpty(latestBuild) && latestBuild != "0")
+            {
+                StatusBar.LatestBuildText = $"Latest Build: {latestBuild}";
+            }
+            else
+            {
+                StatusBar.LatestBuildText = "Latest Build: API Error";
+            }
+
+            // Step 3: Pass the fetched build ID to each server for a quick comparison.
             var allServers = Clusters.SelectMany(c => c.Servers).Where(s => s.IsInstalled);
-            await Task.WhenAll(allServers.Select(svm => svm.CheckForUpdate()).ToList());
+            await Task.WhenAll(allServers.Select(svm => svm.CheckForUpdate(latestBuild)).ToList());
 
-            // THIS IS THE FIX: Forcing the UI to re-evaluate all command states
+            // Step 4: Force the UI to re-evaluate all command states.
             Application.Current.Dispatcher.Invoke(CommandManager.InvalidateRequerySuggested);
-
-            await UpdateLatestBuildIdAsync();
         }
+
 
         private async Task StartUpdate()
         {
@@ -290,19 +306,8 @@ namespace BDSM
 
         private bool CanStartUpdate() => Clusters.SelectMany(c => c.Servers).Any(s => s.IsInstalled && s.IsUpdateAvailable);
 
-        public async Task UpdateLatestBuildIdAsync()
-        {
-            if (_config == null) return;
-            string? latestBuild = await UpdateManager.GetLatestBuildIdAsync(_config.SteamApiUrl, _config.AppId);
-            if (!string.IsNullOrEmpty(latestBuild) && latestBuild != "0")
-            {
-                StatusBar.LatestBuildText = $"Latest Build: {latestBuild}";
-            }
-            else
-            {
-                StatusBar.LatestBuildText = "Latest Build: API Error";
-            }
-        }
+        // This method is now redundant and has been removed. Its logic is inside CheckAllServersForUpdate.
+        // public async Task UpdateLatestBuildIdAsync() { ... }
 
         private record WebhookInfoResponse([property: JsonPropertyName("channel_id")] string ChannelId);
     }
